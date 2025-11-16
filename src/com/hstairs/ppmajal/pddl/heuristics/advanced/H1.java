@@ -1248,10 +1248,13 @@ public class H1 implements SearchHeuristic {
         // definisco un array di IntArraySet
         IntArraySet[] iAch = new IntArraySet[totNumberOfTerms];     // numero totale di termini/condizioni
 
-        // inizializzo iAch con gli achievers diretti (ach)
+        // usa il getter per garantire che l'array allAchievers sia allocato
+        final IntArraySet[] ach = getAllAchievers();
+
+        // inizializzo iAch con gli achievers diretti (ach), gestendo il caso null
         for (int psiId : allComparisons) {
-            // allAchievers[psiId] contiene tutti gli achievers diretti di psi
-            iAch[psiId] = new IntArraySet(allAchievers[psiId]);
+            IntArraySet direct = ach[psiId];
+            iAch[psiId] = (direct == null) ? new IntArraySet() : new IntArraySet(direct);
         }
 
         boolean changes = true;
@@ -1259,10 +1262,9 @@ public class H1 implements SearchHeuristic {
         while (changes) {
             changes = false;
 
-
             for (int psiId : allComparisons) {
                 // copia per l'iterazione, per non modificare l'insieme mentre viene iterato
-                IntArraySet currentIAch = new IntArraySet(iAch[psiId]);
+                IntArraySet currentIAch = (iAch[psiId] == null) ? new IntArraySet() : new IntArraySet(iAch[psiId]);
 
                 // per ogni azione a' che è un IAch(psi)
                 for (int aPrimeId : currentIAch) {
@@ -1271,15 +1273,18 @@ public class H1 implements SearchHeuristic {
 
                     // Per ogni terminale t nella precondizione di a'
                     for (int tId : preconditionTerminals) {
-                        // allAchievers[tId] contiene Ach(t)
+                        // ach[tId] contiene Ach(t)
                         // sono le azioni 'a' che soddisfano: a in Ach(pre(a'))
-                        IntArraySet directAchieversOfT = allAchievers[tId];
+                        IntArraySet directAchieversOfT = ach[tId];
 
                         // se directAchieversOfT è null/vuoto, interrompo l'iterazione
                         if (directAchieversOfT == null) continue;
 
                         for (int aId : directAchieversOfT) {
                             // Se 'a' non è ancora in IAch(psi), lo aggiungo
+                            if (iAch[psiId] == null) {
+                                iAch[psiId] = new IntArraySet();
+                            }
                             if (!iAch[psiId].contains(aId)) {
                                 iAch[psiId].add(aId);
                                 changes = true;
