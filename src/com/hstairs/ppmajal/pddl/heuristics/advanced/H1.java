@@ -16,7 +16,7 @@
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston,
  * MA 02110-1301  USA
  */
- /*
+/*
  * To change this license header, choose License Headers in Project Properties.
  * To change this template file, choose Tools | Templates
  * and open the template in the editor.
@@ -46,67 +46,131 @@ import org.jgrapht.util.FibonacciHeap;
 import org.jgrapht.util.FibonacciHeapNode;
 
 /**
+ * Implementazione di una euristica in stile h_add/h_max su un grafo rilassato.
+ *
+ * Idee chiave:
+ * - Rappresentazione compatta del problema (cp = CompactPDDLProblem) per accedere
+ *   rapidamente a precondizioni/effetti/costi delle "azioni compatte".
+ * - Si mantengono costi stimati per azioni e condizioni terminali e si propaga
+ *   la miglior stima con una coda a priorità (Fibonacci heap).
+ * - Supporto sia proposizionale sia numerico: per i confronti numerici si stima
+ *   il numero di ripetizioni di un'azione necessarie a soddisfare la disuguaglianza.
+ * - Opzionalmente si estrae un piano rilassato (relaxed plan) e le azioni "helpful".
+ *
+ * Parametri principali:
+ * - additive: se true si comporta come h_add, altrimenti usa max sui sotto-obiettivi.
+ * - conjunctionsMax: forza la combinazione a massimo nelle congiunzioni.
+ * - extractRelaxedPlan/helpful*: abilita estrazione MRP e calcolo azioni utili.
+ *
+ *
  * @author enrico
  */
 public class H1 implements SearchHeuristic {
 
     /**
-     * @return the heuristicNumberOfActions
+     * Flag di debug per stampe interne.
      */
-
     static final boolean DEBUG = false;
+
+    // Opzioni per relax-plan e helpful transitions
     final public boolean extractRelaxedPlan;
     final public boolean maxMRP;
 
+    boolean isDomainInterferenceFree;
+
+    // Problema compatto su cui si lavora
     public final CompactPDDLProblem cp;
+
+    // Numero totale di termini/condizioni (ID di Terminal)
     protected final int totNumberOfTerms;
     protected final int totNumberOfTermsRefactored;
 
+    // Problema originale e opzioni varie
     protected final PDDLProblem problem;
     final private boolean helpfulActionsComputation;
-    final IntArraySet[] conditionsAchievableBy;
-    final IntArraySet[] conditionsDeletableBy;
-    final IntArraySet[] conditionToAction;
-    final IntArraySet allConditions;
-    private final IntArraySet allComparisons;
+
+    // Strutture di supporto per aggiornamenti incrementali
+    final IntArraySet[] conditionsAchievableBy;   // cache: condizioni raggiungibili da azione
+    final IntArraySet[] conditionsDeletableBy;    // opzionale: condizioni peggiorabili da azione (smart constraints)
+    final IntArraySet[] conditionToAction;        // mappa condizione -> azioni che la richiedono
+    final IntArraySet allConditions;              // insieme di condizioni terminali usate nel grafo
+    private final IntArraySet allComparisons;     // sottoinsieme di condizioni numeriche (Comparison)
+
+    // Contiene gli id dei terminali per la precondizione di ogni azione.
+    final IntArraySet[] actionPreconditionTerminals;
+
+    // Nodo associato all'azione nella coda di Fibonacci
     protected final FibonacciHeapNode[] nodeOf;
+
+    // Opzioni di raggiungibilità: se attive, si accumulano le azioni viste
     boolean reachability;
     private final boolean conjunctionsMax;
 
-    final float[] actionHCost;
-    private final float[] conditionCost;
+    // Vettori di costo: per azioni (costo dei prerequisiti) e per condizioni
+    final float[] actionHCost;              // costo η(a) per rendere precond. vere
+    private final float[] conditionCost;    // costo stimato ω(ψ)
+
+    // Azioni "chiuse" (espanse) nella Dijkstra/Uniform-Cost like
     protected final boolean[] closed;
 
+    // Se true => h_add (somma), se false => h_max/misto
     final boolean additive;
+
+    // Condizioni/azioni vere a costo 0 nello stato iniziale
     private final boolean[] conditionInit;
     private final boolean[] actionInit;
+
+    // Se aggiungere suggerimenti di transizioni helpful nell'insieme restituito
     private final boolean helpfulTransitions;
+
+    // Gestione memoria per contributi numerici
     private final boolean hardcoreVersion;
     private final float[][] numericContributionRaw;
-    private final Map<Pair<Integer, Integer>, Float> numericContribution;
+    private final Map<Pair<Integer, Integer>, Float> numericContribution; // alternativa a mappa
+
+    // Rifasatori per indicizzare compatto (riducono spazio quando gli ID sono sparsi)
     protected final ArrayShifter termsArrayShifter;
     protected final ArrayShifter actionsArrayShifter;
     protected final int totNumberOfActionsRefactored;
+
+    // Achievers ed info per rilassato/smart constraints
     IntArraySet[] allAchievers;
     final private IntArraySet[] deleters;
-    protected int[] establishedAchiever;
-    protected float[] numRepetition;
+
+    // Insieme degli indirect achievers per ogni condizione terminale
+    private IntArraySet[] indirectAchievers;
+
+    // Per relaxed plan: action scelta per raggiungere una condizione e num ripetizioni
+    protected int[] establishedAchiever;    // achiever registrato per ogni condizione
+    protected float[] numRepetition;        // numero ripetizioni per ogni condizione
+
+    // Helpful e raggiungibilità
     private IntArraySet helpfulActions;
     IntArraySet reachableTransitions;
     private Collection<TransitionGround> reachableTransitionsInstances;
 
+    // Costante speciale: effetto numerico sconosciuto/complesso
     final float UNKNOWNEFFECT = Float.NEGATIVE_INFINITY;
+
+    // Azioni con precondizioni vuote attive all'inizio a costo 0
     final protected IntArraySet freePreconditionActions;
-//    private List<Pair<Integer, IntArraySet>> plan;
+
+    // Insieme (di ID) del piano rilassato
     private IntArraySet plan;
+
+    // Per ogni transizione reale, insieme di ripetizioni necessarie osservate nel piano
     final protected IntArraySet[] repetitionsInThePlan;
-    private float[] minAchieverPreconditionCost;
+
+    // Per strategia non additiva: minimo costo dei prerequisiti fra gli achiever
+    private float[] minAchieverPreconditionCost;    // costo min achiever per cond. numeriche
+
+    // Insieme di tutte le azioni compatte considerate dall’euristica
     protected IntArraySet allActions;
 
+    // Abilitazione di vincoli smart
     final boolean useSmartConstraints;
-    
 
-    //Plan Fixing Data Structures;
+    // Strutture per visita nel relaxed plan
     final boolean[] visited;
     protected final int[] maxNumRepetition ;
     private boolean hardConditionthroughNumError;
@@ -119,28 +183,38 @@ public class H1 implements SearchHeuristic {
     }
 
 
-    
+
     public H1(PDDLProblem problem, boolean additive) {
         this(problem, additive, false, false, "no", false, false, false, false, null, false, -1);
     }
 
+    /**
+     * Costruttore "completo", consente di configurare tutte le modalità della H1.
+     * Vedere altri costruttori per default sensati.
+     */
     public H1(PDDLProblem problem, boolean additive, boolean extractRelaxedPlan, boolean maxHelpfulTransitions, String redConstraints, boolean helpfulActionsComputation, boolean reachability,
-            boolean helpfulTransitions, boolean conjunctionsMax, boolean unitaryCost, int linearEffectsAbstraction) {
+              boolean helpfulTransitions, boolean conjunctionsMax, boolean unitaryCost, int linearEffectsAbstraction) {
         this(problem, additive, extractRelaxedPlan, maxHelpfulTransitions,
                 redConstraints, helpfulActionsComputation, reachability,
                 helpfulTransitions, conjunctionsMax, null, unitaryCost, linearEffectsAbstraction);
     }
 
     public H1(PDDLProblem problem, boolean additive, boolean extractRelaxedPlan, boolean maxHelpfulTransitions, String redConstraints, boolean helpfulActionsComputation, boolean reachability,
-            boolean helpfulTransitions, boolean conjunctionsMax, boolean unitaryCost) {
+              boolean helpfulTransitions, boolean conjunctionsMax, boolean unitaryCost) {
         this(problem, additive, extractRelaxedPlan, maxHelpfulTransitions,
                 redConstraints, helpfulActionsComputation, reachability, helpfulTransitions,
                 conjunctionsMax, null, unitaryCost, -1);
     }
 
+    /**
+     * Costruisce la struttura euristica:
+     * - Trasforma il problema in rappresentazione compatta (cp).
+     * - Inizializza insiemi/array per costi e caching.
+     * - Pre-registra le precondizioni per tutte le azioni compatte e il goal.
+     */
     public H1(PDDLProblem problem, boolean additive, boolean extractRelaxedPlan, boolean maxHelpfulTransitions, String redConstraints, boolean helpfulActionsComputation, boolean reachability,
-            boolean helpfulTransitions, boolean conjunctionsMax, Map<AndCond,
-            Collection<IntArraySet>> redundantMap, boolean unitaryCost, int compNumericStrategy) {
+              boolean helpfulTransitions, boolean conjunctionsMax, Map<AndCond,
+                    Collection<IntArraySet>> redundantMap, boolean unitaryCost, int compNumericStrategy) {
         this.storeInitActions = false;
         long startSetup = System.currentTimeMillis();
         this.additive = additive;
@@ -151,43 +225,48 @@ public class H1 implements SearchHeuristic {
         allComparisons = new IntArraySet();
         freePreconditionActions = new IntArraySet();
         hardConditionthroughNumError = compNumericStrategy > -2;
-//        problem.prettyPrint();
+        // Se abilitata, stampa che le condizioni numeriche hard verranno gestite con penalità
         if (hardConditionthroughNumError)
             System.out.println("Numeric Error for Complex Condition Activated");
+
+        // Rappresentazione compatta del problema (pre, effetti, costi, mapping)
         cp = ProblemTransfomer.generateCompactProblem(problem, redConstraints, unitaryCost, compNumericStrategy);
-//        System.out.println(cp);
         useSmartConstraints = "smart".equals(redConstraints);
 
+        // Spazio di condizioni/termini e strutture di indicizzazione
         totNumberOfTerms = Terminal.getTotCounter();
         conditionsAchievableBy = new IntArraySet[cp.numActions()];
         conditionToAction = new IntArraySet[totNumberOfTerms];
         allConditions = new IntArraySet();
         allActions = new IntArraySet();
 
+        // Alloca nodi per heap e popola mapping precondizioni/azioni
         nodeOf = new FibonacciHeapNode[cp.numActions()];
+
+        actionPreconditionTerminals = new IntArraySet[cp.numActions()];
+
         fillPreEffFunctions(new LinkedHashSet(problem.actions));
         fillPreEffFunctions(new LinkedHashSet(problem.getEventsSet()));
         fillPreEffFunctions(new LinkedHashSet(problem.getProcessesSet()));
 
+        // Aggiunge la pseudo-azione di goal e registra le sue precondizioni
         allActions.add(cp.goal());
         updatePreconditionFunction(cp.goal());
 
+        // Rifasatori per indicizzazione compatta in matrici ??
         termsArrayShifter = new ArrayShifter(getAllConditions());
         totNumberOfTermsRefactored = termsArrayShifter.getMaxTid();
 
         actionsArrayShifter = new ArrayShifter(allActions);
         totNumberOfActionsRefactored = actionsArrayShifter.getMaxTid();
 
+        // Vettori di costo per la ricerca best-first/Uniform-Cost-like
         actionHCost = new float[cp.numActions()];
         conditionCost = new float[totNumberOfTerms];
         closed = new boolean[cp.numActions()];
 
+        // Sceglie rappresentazione del contributo numerico in base alla memoria prevista
         hardcoreVersion = cp.numActions() * totNumberOfTermsRefactored < 1999999999;
-//        System.out.println("Heuristic Number of Actions:" + heuristicNumberOfActions);
-//        System.out.println("Heuristic Number of Actions Refactored:" + totNumberOfActionsRefactored);
-//        System.out.println("Tot Number of Terms:" + totNumberOfTerms);
-//        System.out.println("Tot Number of Terms Refactored:" + totNumberOfTermsRefactored);
-
         if (hardcoreVersion) {
             numericContributionRaw = new float[totNumberOfActionsRefactored][totNumberOfTermsRefactored];
             for (final float[] row : numericContributionRaw) {
@@ -195,21 +274,23 @@ public class H1 implements SearchHeuristic {
             }
             numericContribution = null;
         } else {
-//            System.out.println("H1 with small memory footprint");
+            // Versione con mappa (minore footprint immediato per sparse)
             numericContributionRaw = null;
             numericContribution = new HashMap<>();
         }
-        //        numericContribution = new HashMap<>();
 
+        // Inizializza vettori di stato di partenza
         conditionInit = new boolean[totNumberOfTerms];
         actionInit = new boolean[cp.numActions()];
+
+        // Se servono achievers/deleters li alloca ora
         if (extractRelaxedPlan || useSmartConstraints || helpfulActionsComputation) {
             allAchievers = new IntArraySet[totNumberOfTerms];
         }
         if (useSmartConstraints) {
             deleters = new IntArraySet[totNumberOfTerms];
             conditionsDeletableBy = new IntArraySet[cp.numActions()];
-        }else{
+        } else {
             deleters = null;
             conditionsDeletableBy = null;
         }
@@ -219,6 +300,7 @@ public class H1 implements SearchHeuristic {
         }
         this.helpfulTransitions = helpfulTransitions;
         if (!additive) {
+            // Per la combinazione "max" si traccia il minimo costo di prerequisiti
             minAchieverPreconditionCost = new float[totNumberOfTerms];
         }
 
@@ -226,19 +308,23 @@ public class H1 implements SearchHeuristic {
         this.conjunctionsMax = conjunctionsMax;
         System.out.println("H1 Setup Time (msec): " + (System.currentTimeMillis() - startSetup));
 
-
+        // Strutture per relaxed plan e helpful actions
         if (extractRelaxedPlan || helpfulActionsComputation){
             maxNumRepetition = new int[Transition.totNumberOfTransitions+1];
             visited = new boolean[totNumberOfTerms];
             repetitionsInThePlan = new IntArraySet[Transition.totNumberOfTransitions+1];
-        }else{
+        } else {
             visited = null;
             maxNumRepetition = null;
             repetitionsInThePlan = null;
         }
-
+        computeInterferenceFree();
     }
 
+    /**
+     * Registra tutte le azioni derivate da una transizione
+     * e ne indicizza le precondizioni terminali per aggiornamenti veloci.
+     */
     private void fillPreEffFunctions(LinkedHashSet<TransitionGround> transitions) {
 
         for (final TransitionGround b : transitions) {
@@ -250,48 +336,97 @@ public class H1 implements SearchHeuristic {
 
     }
 
-    
+
+    /**
+     * Estrae le condizioni terminali dalla precondizione dell'azione compatta i
+     * e popola:
+     * - freePreconditionActions se non ci sono terminali (azione attivabile gratis);
+     * - conditionToAction per notificare quali azioni dipendono da quale condizione;
+     * - allConditions e allComparisons (solo per le Comparison normalizzate).
+     */
     void updatePreconditionFunction(int i) {
+        // estrae tutte le condizioni terminali dalla precondizione.
         final Collection<Condition> terminalConditions = cp.preconditionFunction()[i].getTerminalConditionsInArray();
+
+        // Inizializza il set per questa azione (anche se le precondizioni sono vuote)
+        actionPreconditionTerminals[i] = new IntArraySet();
+
         if (terminalConditions.isEmpty()) {
             freePreconditionActions.add(i);
         }
+
+        // Itera su ogni terminale trovato
         for (final Condition c : terminalConditions) {
             if (c instanceof Terminal) {
                 final Terminal t = (Terminal) c;
+
+                // Aggiunge l'id del terminale all'insieme specifico di questa azione.
+                // lo uso dopo per controllare l'implicazione??
+                // La funzione scorre la precondizione di un'azione a_i.
+                // Registra tutti i terminali in actionPreconditionTerminals[i] (mappa diretta).
+                actionPreconditionTerminals[i].add(t.getId());
+
                 IntArraySet groundActions = getConditionToAction()[((Terminal) c).getId()];
                 if (groundActions == null) {
                     groundActions = new IntArraySet();
                 }
                 groundActions.add(i);
+                // usa gli stessi terminali per popolare conditionToAction[t.getId()
                 conditionToAction[t.getId()] = groundActions;
                 getAllConditions().add(((Terminal) c).getId());
                 if (c instanceof Comparison) {
-//                    System.out.println(c);
                     final Comparison normalize = (Comparison) c.normalize();
-//                    System.out.println(normalize);
+                    // Salviamo solo l'id normalizzato per il set allComparisons
                     getAllComparisons().add(normalize.getId());
                 }
             }
         }
     }
 
+    /**
+     * Prepara lo stato iniziale della propagazione:
+     * - Reset di costi e flag;
+     * - Inserimento in coda delle azioni con precondizioni inizialmente soddisfatte
+     *   (o freePreconditionActions) con costo 0;
+     * - Propagazione iniziale delle condizioni vere nello stato di input.
+     * Il metodo smallSetup(State gs) inizializza tutti i costi a Float.MAX_VALUE,
+     * segna i literal veri nello stato iniziale impostando conditionCost[t]=0
+     * per i terminal veri e chiama updateActions(...) sulle condizioni vere
+     * per inserire azioni inizialmente applicabili nella coda con costo 0.
+     * Questo corrisponde all’inizializzazione di ω e di η.
+     */
     protected FibonacciHeap smallSetup(State gs) {
+        /*  actionHCost = costo corrente stimato per ciascuna azione nell’open-list (inizialmente infinito).
+            conditionCost = costo stimato per ciascuna condizione (terminal literal), inizialmente infinito.
+            closed = flag che indica se una azione è stata già "espansa"/chiusa.
+            actionInit / conditionInit = flag che indicano se quell’elemento è stato inizializzato (messo nella coda o segnato come raggiunto dallo starting state).
+         */
         Arrays.fill(getActionHCost(), Float.MAX_VALUE);
         Arrays.fill(getConditionCost(), Float.MAX_VALUE);
         Arrays.fill(getClosed(), false);
         Arrays.fill(getActionInit(), false);
         Arrays.fill(getConditionInit(), false);
+
+        /*
+        establishedAchiever e numRepetition sono strutture usate per la ricostruzione del relaxed plan
+        (e per criteri di ripetizione/numero di volte che un achiever è considerato).
+        Vengono impostate solo quando serve la ricostruzione del piano rilassato o il calcolo delle helpful actions.
+         */
         if (extractRelaxedPlan || isHelpfulActionsComputation()) {
             Arrays.fill(establishedAchiever, -1);
             Arrays.fill(numRepetition, Float.MAX_VALUE);
         }
+
+        /*
+        In domini non-additivi serve tracciare ulteriori informazioni sulla distribuzione dei costi dei precondizioni per trovare il min achiever corretto.
+         */
         if (!isAdditive()) {
             Arrays.fill(minAchieverPreconditionCost, Float.POSITIVE_INFINITY);
         }
 
-//        Printer.pddlPrint(problem, (PDDLState) gs);
         final FibonacciHeap h = new FibonacciHeap();
+
+        // Condizioni già vere nello stato hanno costo 0: notifica le azioni che le richiedono
         for (final int i : getAllConditions()) {
             if (gs.satisfy(Terminal.getTerminal(i))) {
                 conditionCost[i] = 0f;
@@ -299,66 +434,85 @@ public class H1 implements SearchHeuristic {
                 updateActions(i, h, true);
             }
         }
+
+        // Azioni con precondizioni vuote attive all'inizio a costo 0
         for (final int freePreconditionAction : freePreconditionActions) {
             actionHCost[freePreconditionAction] = 0f;
             actionInit[freePreconditionAction] = true;
             addActionsInPriority(freePreconditionAction, h, 0f);
         }
-        
+
+        // Opzionale: salva l'elenco delle azioni iniziali (se abilitato)
         if (storeInitActions){
             initActions = new ArrayList<>();
             for (var act: allActions ){
                 try {
                     initActions.add((TransitionGround) getTransition(cp.cpTr2TrMap()[act]));
                 }catch(final Exception e){
-                    throw new UnsupportedOperationException("Init actions storage only works without processes");
+                    throw new UnsupportedOperationException("Init actions storage only works senza processi attivi");
                 }
             }
         }
         return h;
     }
 
+    /**
+     * Esegue la propagazione dei costi (Dijkstra/Uniform-Cost-like) sul grafo rilassato.
+     * Ritorna il costo del goal oppure, se richiesto, il costo del relaxed plan estratto.
+     */
     @Override
     public float computeEstimate(State gs) {
         final FibonacciHeap h = this.smallSetup(gs);
-        //reachability = reachableTransitions == null /* First time executing it*/|| reachability;
+        // dontstop true => calcolo anche insiemi di raggiungibilità
         final boolean dontstop = reachability || reachableTransitions == null;
+
         while (!h.isEmpty()) {
+            // Si estrae l’azione con costo minimo
             final int actionId = (int) h.removeMin().getData();
-//            System.out.println(Transition.getTransition(actionId));
-//            for (int i=0;i<=Transition.totNumberOfTransitions;i++)
-//                System.out.println(cp.actionCost()[i]);
+
             if (actionId == cp.goal() && !dontstop) {
                 break;
             }
+
+            // Se dontstop è attivo e l’azione non è il goal, l’azione viene aggiunta a reachableTransitions.
             if (dontstop && actionId != cp.goal()) {
                 if (reachableTransitions == null) {
                     reachableTransitions = new IntArraySet();
                 }
                 reachableTransitions.add(actionId);
             }
+
+            // Si marca closed[actionId] = true.
             closed[actionId] = true;
+
+            // Se actionId != cp.goal() allora si chiama expand(actionId, h, gs),
+            // che aggiorna i costi delle condizioni che l’azione può rendere vere (e quindi invoca updateActions per quelle condizioni)
             if (actionId != cp.goal()) {
                 expand(actionId, h, gs);
             }
         }
-        
+
+        // Se, al termine del ciclo, il goal non è stato raggiunto euristicamente
         if (getActionHCost()[cp.goal()] == Float.MAX_VALUE ){
             return Float.MAX_VALUE;
         }
-        
+
+        // Estrazione del piano rilassato (se richiesto)
         if (this.extractRelaxedPlan){
             return relaxedPlanCost(gs);
         }
-        
-        if (this.isHelpfulActionsComputation()){//this is to be used when hadd is wanted to be used with helpful actions taken from mrp
+
+        // Calcolo h_add (o h_max) con ricostruzione helpful (se richiesto)
+        if (this.isHelpfulActionsComputation()){
             relaxedPlanCost(gs);
         }
-//        System.exit(-1);
         return getActionHCost()[cp.goal()];
 
     }
 
+    /**
+     * Inserisce un'azione nella coda con priorità v, memorizzando il nodo.
+     */
     void addActionsInPriority(final int i, final FibonacciHeap p, final float v) {
         final FibonacciHeapNode fibonacciHeapNode = new FibonacciHeapNode(i);
         nodeOf[i] = fibonacciHeapNode;
@@ -369,15 +523,33 @@ public class H1 implements SearchHeuristic {
         this.updateActions(c, p, false);
     }
 
+    /**
+     * Dato un ID di condizione c diventata più economica, ricalcola la stima
+     * dei prerequisiti per tutte le azioni che dipendono da c e aggiorna la coda.
+     * Se init==true e il costo precondizioni è 0, marca l’azione come "init".
+     *
+     * Funzione che notifica tutte le azioni che hanno i tra le loro precondizioni:
+     * aggiorna costi parziali delle azioni e può inserire azioni nella coda quando
+     * tutte/sufficienti precondizioni sono state raggiunte.
+     */
     protected void updateActions(final int c, final FibonacciHeap p, boolean init) {
-        final IntArraySet actions = getConditionToAction()[c];
+        // trovare tutte le azioni (actionId) che utilizzano la condizione come precondizione terminale.
+        final IntArraySet actions = getConditionToAction()[c]; //getConditionToAction() è un array in cui ogni indice (conditionId) punta a un insieme (IntSet) di ID di azioni che hanno quella condizione tra i loro prerequisiti.
+
         if (actions != null) {
+
+            // Il metodo itera su tutte le azioni contenute in actions.
+            // Per ciascuna azione, esegue il ricalcolo del suo costo euristico
             for (final int i : actions) {
-                if (!getClosed()[i]) {
+                if (!getClosed()[i]) { // Se l'azione non è ancora chiusa
+                    // Calcolo di η_nuovo(a)
                     float v = estimateCost(cp.preconditionFunction()[i], getActionHCost()[i]);
+
                     if (init && v == 0) {
                         actionInit[i] = true;
                     }
+
+                    // Aggiornamento e Gestione dell'Heap
                     if (v < Float.MAX_VALUE) {
                         if (v < getActionHCost()[i]) {
                             if (getActionHCost()[i] == Float.MAX_VALUE) {
@@ -394,6 +566,11 @@ public class H1 implements SearchHeuristic {
         }
     }
 
+    /**
+     * Ricostruisce il piano rilassato a partire dalla precondizione del goal.
+     * Si navigano ricorsivamente le condizioni attivate/achievers stabiliti
+     * e si accumulano le ripetizioni necessarie per ciascuna azione.
+     */
     protected float relaxedPlanCost(State gs) {
         final Condition goal = cp.preconditionFunction()[cp.goal()];
 
@@ -411,6 +588,7 @@ public class H1 implements SearchHeuristic {
             for (final int conditionId : (Collection<Integer>) elements.getFirst()) {
                 if (!visited[conditionId]) {
                     if (!getConditionInit()[conditionId]) {
+                        // Helpful actions: tra gli achiever di questa condizione, quelli già "init"
                         if (isHelpfulActionsComputation()) {
                             if (getAchievers(conditionId).isEmpty()) {
                                 throw new RuntimeException("Houston we have problem here. Condition \n" + Terminal.getTerminal(conditionId) + " has never been achieved");
@@ -421,47 +599,47 @@ public class H1 implements SearchHeuristic {
                                 }
                             }
                         }
-                        
+
                         final int actionId = establishedAchiever[conditionId];
                         final int rep = (int) ceil(numRepetition[conditionId]);
                         final int trActionId = cp.cpTr2TrMap()[actionId];
                         if (repetitionsInThePlan[trActionId] == null){
                             repetitionsInThePlan[trActionId] = new IntArraySet();
                         }
-                        
+
+                        // Traccia le ripetizioni osservate per l’azione reale
                         if (maxNumRepetition[trActionId] != rep){
                             repetitionsInThePlan[trActionId].add(rep);
                             maxNumRepetition[trActionId] = Math.max(maxNumRepetition[trActionId],rep);
                         }
-//                        plan.add(actionId);
+                        // Aggiunge l’azione reale al piano rilassato
                         plan.add(cp.cpTr2TrMap()[actionId]);
+                        // Espande ricorsivamente le precondizioni dell’azione scelta
                         stack.push(getActivatingConditions(cp.preconditionFunction()[actionId]));
                     }
                     visited[conditionId] = true;
                 }
             }
         }
-        
-        //This is the MRP
+
+        // Costo del MRP (Minimum/Max Relaxed Plan) in funzione della politica maxMRP
         float ret = 0;
         for (final int action : plan) {
-            //all cp actions for a given action have the same cost.
+            // tutte le azioni compatte per una data transizione condividono il costo
             final var t = cp.tr2CpTrMap()[action].iterator().next();
             ret += maxNumRepetition[action] * getActionCost()[t];
-//            System.out.println(TransitionGround.getTransition(action) + " " + maxNumRepetition[action]);
         }
-
-//        System.exit(-1);
         return ret;
     }
 
     @Override
     public Collection getAllEstimates() {
-        return SearchHeuristic.super.getAllEstimates(); //To change body of generated methods, choose Tools | Templates.
+        return SearchHeuristic.super.getAllEstimates(); // default
     }
-    
-    
 
+    /**
+     * Restituisce (e crea se necessario) l'insieme di achiever per una condizione.
+     */
     public IntArraySet getAchievers(int conditionId) {
         final IntArraySet achiever = getAllAchievers()[conditionId];
         if (achiever == null) {
@@ -470,50 +648,73 @@ public class H1 implements SearchHeuristic {
         return getAllAchievers()[conditionId];
     }
 
+    /**
+     * Espansione di un'azione estratta dalla coda:
+     * - Per ogni condizione che l’azione può rendere vera (proposizionale o numerica),
+     * calcola il nuovo costo candidato e, se migliora, aggiorna la stima e il relax plan.
+     */
     private void expand(int actionId, FibonacciHeap p, State s) {
 
+        // Recupera tutte le condizioni terminali che l'azione può potenzialmente rendere vere o migliorare.
         final IntSet conditionsAchievableByAction = getConditionsAchievableById(actionId);
-        for (final int conditionId : conditionsAchievableByAction) {//This is for all terminal conditions
+
+        for (final int conditionId : conditionsAchievableByAction) { // tutte le condizioni terminali influenzate
+
+            // La condizione !getConditionInit()[conditionId] assicura che si considerino solo le condizioni non ancora soddisfatte nello stato iniziale.
             if (!getConditionInit()[conditionId] && (!isReachability() || getConditionCost()[conditionId] == Float.MAX_VALUE)) {
                 final Terminal t = Terminal.getTerminal(conditionId);
                 boolean update = false;
-                if (t instanceof BoolPredicate || t instanceof NotCond) {//affecting a prop variable
+
+                if (t instanceof BoolPredicate || t instanceof NotCond) { // effetto proposizionale
+
+                    // Nuovo Costo: costo dei prerequisiti (getActionHCost()[actionId]) + costo dell'azione stessa (getActionCost()[actionId]).
+                    // Se il nuovo costo è minore del costo corrente (updateIfNeeded), la condizione viene aggiornata e l'azione viene registrata come achiever con 1 ripetizione.
                     if (updateIfNeeded(conditionId, getActionHCost()[actionId] + getActionCost()[actionId])) {
                         update = true;
                         cacheValue(getActionCost()[actionId],actionId,t);
                         updateRelPlanInfo(conditionId, actionId, 1);
                     }
-                } else {//affecting a num comparison
-                    final double v = this.numericContribution(actionId, (Comparison) t);
-                    if (v > 0) {
+                } else { // confronto numerico
 
+                    // Viene calcolato quanto l'azione influenza la variabile numerica coinvolta
+                    final double v = this.numericContribution(actionId, (Comparison) t);
+
+                    if (v > 0) {
+                        // Quante volte ripetere l’azione per soddisfare la disuguaglianza
                         float rep = computeRepetition(t,v,s);
-                        final float newCost = rep * getActionCost()[actionId];
+                        final float executionCost = rep * getActionCost()[actionId]; // Costo di esecuzione rep * gamma(a)
                         boolean localUpdate = false;
-                        if (isAdditive()) {
-                            localUpdate = updateIfNeeded(conditionId, getActionHCost()[actionId] + newCost);
+
+                        if (isAdditive() || this.isDomainInterferenceFree) {
+                            // Se h_add O h_max Interference-Free:
+                            // Costo = CostoPrerequisiti(a) + CostoEsecuzione(a) (minimo della somma)
+                            // Il costo cumulato è la somma del costo dei prerequisiti e del costo di esecuzione (executionCost).
+                            localUpdate = updateIfNeeded(conditionId, getActionHCost()[actionId] + executionCost);
                         } else {
+                            // Logica h_max standard
+                            // Costo = minAchieverPreconditionCost + CostoEsecuzione(a) (somma dei minimi)
+                            // Si usa la somma del minimo costo dei prerequisiti tra tutti gli achievers visti finora e il costo di esecuzione.
                             if (getActionHCost()[actionId] < minAchieverPreconditionCost[conditionId]) {
                                 minAchieverPreconditionCost[conditionId] = getActionHCost()[actionId];
                             }
-                            localUpdate = updateIfNeeded(conditionId, minAchieverPreconditionCost[conditionId] + newCost);
+                            localUpdate = updateIfNeeded(conditionId, minAchieverPreconditionCost[conditionId] + executionCost);
                         }
                         if (localUpdate) {
-                            cacheValue(newCost,actionId,t);
+                            cacheValue(executionCost,actionId,t);
                             update = true;
                             updateRelPlanInfo(conditionId, actionId, rep);
                         }
-                    } else if (v == UNKNOWNEFFECT) {//this is a hard condition basically
-
+                    } else if (v == UNKNOWNEFFECT) { // effetto difficile/non lineare: gestione conservativa
                         float newCost = 0f;
                         float rep = computeRepetition(t, 1f, s);
                         if (rep < 0){
                             rep = 0f;
                         }
                         if (isAdditive()) {
+                            // Se attivato, penalizza in proporzione a quante volte ipotizziamo di ripetere l'azione
                             if (hardConditionthroughNumError) {
                                 newCost = rep*getActionCost()[actionId];
-                            }else{
+                            } else {
                                 newCost = getActionCost()[actionId];
                             }
                         }
@@ -522,8 +723,8 @@ public class H1 implements SearchHeuristic {
                             updateRelPlanInfo(conditionId, actionId, rep);
                         }
                     }
-
                 }
+                // Se un qualsiasi aggiornamento è avvenuto (update = true), il nuovo costo della condizione viene propagato alle azioni che la richiedono:
                 if (update) {
                     updateActions(conditionId, p);
                 }
@@ -532,12 +733,18 @@ public class H1 implements SearchHeuristic {
 
     }
 
+    /**
+     * Memorizza l’azione come achiever (se necessario per relaxed plan/smart constraints).
+     */
     protected void updateAchievers(int conditionId, int actionId) {
         if (extractRelaxedPlan || useSmartConstraints || isHelpfulActionsComputation() ) {
             getAchievers(conditionId).add(actionId);
         }
     }
 
+    /**
+     * Aggiorna le strutture per la ricostruzione del piano rilassato.
+     */
     protected void updateRelPlanInfo(int conditionId, int actionId, float rep) {
         if (extractRelaxedPlan || isHelpfulActionsComputation()) {
             establishedAchiever[conditionId] = actionId;
@@ -545,6 +752,9 @@ public class H1 implements SearchHeuristic {
         }
     }
 
+    /**
+     * Aggiorna il costo di una condizione se è migliorativo.
+     */
     protected boolean updateIfNeeded(final int t, final float value) {
         if (getConditionCost()[t] > value) {
             conditionCost[t] = value;
@@ -553,6 +763,10 @@ public class H1 implements SearchHeuristic {
         return false;
     }
 
+    /**
+     * Restituisce le condizioni terminali "attivanti" per una formula (And/Or/Terminal)
+     * e il costo cumulato corrispondente secondo la politica additiva o di massimo.
+     */
     protected Pair<Collection, Float> getActivatingConditions(final Condition c) {
         if (c instanceof AndCond) {
             final AndCond and = (AndCond) c;
@@ -593,11 +807,14 @@ public class H1 implements SearchHeuristic {
         }
     }
 
-    
+    /**
+     * Stima il costo per soddisfare una formula c, combinando i figli secondo
+     * h_add (somma) o h_max (massimo), e applicando pruning se la stima supera "previous".
+     */
     protected float estimateCost(final Condition c, float previous) {
         return this.estimateCost(c, isAdditive(),previous);
     }
-    
+
 
     private float estimateCost(final Condition c, boolean additive, float previous) {
         if (c instanceof AndCond and) {
@@ -610,10 +827,10 @@ public class H1 implements SearchHeuristic {
                 if (estimate == Float.MAX_VALUE || estimate >=previous) {
                     return estimate;
                 }
-                if (additive && !isConjunctionsMax()) {// && !this.extractRelaxedPlan) {
+                if (additive && !isConjunctionsMax()) {// h_add
                     ret += estimate;
-                } else {
-                    ret = (estimate > ret) ? estimate : ret;
+                } else { // h_max
+                    ret = Math.max(estimate, ret);
                 }
             }
             return ret;
@@ -640,6 +857,9 @@ public class H1 implements SearchHeuristic {
         }
     }
 
+    /**
+     * Caching del contributo numerico: salva in matrice o mappa in base alla modalità.
+     */
     void setNumericContribution(int a, int b, float value) {
         if (hardcoreVersion) {
             numericContributionRaw[actionsArrayShifter.getTID(a)][termsArrayShifter.getTID(b)] = value;
@@ -655,14 +875,18 @@ public class H1 implements SearchHeuristic {
         return numericContribution.getOrDefault(Pair.of(actionsArrayShifter.getTID(a), termsArrayShifter.getTID(b)), Float.MAX_VALUE);
     }
 
-    //Semantics: UNKNOWEFFECT don't know because comp is hard. > 0 is achiever, 0 no
+    /**
+     * Calcola il "contributo" di un'azione su una Comparison (positivo se la avvicina
+     * alla soddisfazione, negativo se la allontana, UNKNOWNEFFECT se non determinabile).
+     * Gli effetti costanti "increase/decrease" vengono accumulati; effetti con dipendenza
+     * dallo stato o "assign" non numerico vengono marcati come UNKNOWNEFFECT.
+     */
     protected float numericContribution(int t, Comparison comp) {
-        
+
         if (cp.numericEffectFunction()[t] == null || cp.numericEffectFunction()[t].isEmpty()) {
             return 0f;
         }
 
-//        Float positiveness = numericContribution[t][comp.getId()];
         Float positiveness = getNumericContribution(t, comp.getId());
         if (positiveness == Float.MAX_VALUE) {
             positiveness = 0f;
@@ -673,6 +897,7 @@ public class H1 implements SearchHeuristic {
             if (comp.getLeft() instanceof ExtendedNormExpression extendedNormExpression) {
                 final ExtendedNormExpression left = extendedNormExpression;
                 for (final ExtendedAddendum ad : left.summations) {
+                    // Termine binario: se tocca fluent coinvolti negli effetti => sconosciuto
                     if (ad.bin != null) {
                         for (final NumEffect ne : cp.numericEffectFunction()[t]) {
                             NumFluent fluentAffected = ne.getFluentAffected();
@@ -682,6 +907,7 @@ public class H1 implements SearchHeuristic {
                             }
                         }
                     }
+                    // Termine lineare su un fluente: accumula costante se effetto è costante
                     if (ad.f != null) {
                         for (final NumEffect ne : cp.numericEffectFunction()[t]) {
 
@@ -700,7 +926,7 @@ public class H1 implements SearchHeuristic {
                                 } else if (ne.getOperator().equals("decrease")) {
                                     positiveness += (-1) * rhs.getNumber().floatValue() * ad.n.floatValue();
                                 }
-                            } else {//The effect is state dependent.
+                            } else {// Effetto dipendente dallo stato: marca come sconosciuto
                                 setNumericContribution(t, comp.getId(), UNKNOWNEFFECT);
                                 return UNKNOWNEFFECT;
                             }
@@ -716,6 +942,9 @@ public class H1 implements SearchHeuristic {
         return positiveness;
     }
 
+    /**
+     * Restituisce l'insieme di azioni potenziali, opzionalmente arricchito con helpful transitions.
+     */
     @Override
     public Object[] getTransitions(final boolean helpful) {
         Collection res = null;
@@ -748,20 +977,14 @@ public class H1 implements SearchHeuristic {
 
         }
         if (helpfulTransitions) {
-//            if (helpfulActionsComputation) {
-//                for (Pair<TransitionGround, Integer> helpfulTransition : getHelpfulTransitions()) {
-//                    res.remove(helpfulTransition.getLeft());
-//                    res.add(helpfulTransition);
-//                }
-//            }else {
             res.addAll(getHelpfulTransitions());
-            //
-//            }
         }
         return res.toArray();
     }
 
-
+    /**
+     * Azioni applicabili potenzialmente (o quelle iniziali se è attiva la memorizzazione).
+     */
     public Collection<TransitionGround> getPotentialApplicableActions(){
         if (storeInitActions){
             return this.initActions;
@@ -787,6 +1010,9 @@ public class H1 implements SearchHeuristic {
         }
     }
 
+    /**
+     * Estrae le helpful transitions con molteplicità (min o max) dal piano rilassato.
+     */
     public Collection<Pair<TransitionGround, Integer>> getHelpfulTransitions() {
         if (!extractRelaxedPlan && !isHelpfulActionsComputation()) {
             throw new RuntimeException("Helpful Transitions can only be activatated in combination with the relaxed plan extraction");
@@ -794,7 +1020,7 @@ public class H1 implements SearchHeuristic {
         Collection<Pair<TransitionGround, Integer>> res = new ArrayList<>();
 
         for (final int actionTransitionId : plan) {
-            int actionId = cp.tr2CpTrMap()[actionTransitionId].iterator().next();//Assume that there is a one-to-one relantioship between actions in the heuristic and actions in the search
+            int actionId = cp.tr2CpTrMap()[actionTransitionId].iterator().next();//Assume relazione 1-1 euristica/ricerca
             if (getActionInit()[actionId]) {
                 final IntArraySet right = repetitionsInThePlan[actionTransitionId];
                 if (!right.isEmpty()) {
@@ -825,7 +1051,9 @@ public class H1 implements SearchHeuristic {
         return res;
     }
 
-   
+    /**
+     * Registra che un'azione può "cancellare/peggiorare" un Comparison (smart constraints).
+     */
     public void addDeleter(int i, int actId) {
         if (deleters[i] == null) {
             deleters[i] = new IntArraySet();
@@ -837,16 +1065,22 @@ public class H1 implements SearchHeuristic {
         addDeleter(t, actionId);
     }
 
-
-
+    /**
+     * Restituisce la formulazione del goal come Condition (precondizione della pseudo-azione di goal).
+     */
     public Condition getGoalFormulation() {
         return cp.preconditionFunction()[cp.goal()];
     }
 
+    /**
+     * Restituisce (con caching) l'insieme di condizioni terminali che possono essere
+     * rese vere/peggiorate dall'azione data (proposizionali ∪ numeriche).
+     */
     protected IntSet getConditionsAchievableById(int actionId) {
         if (getConditionsAchievableBy()[actionId] == null) {
             final IntArraySet achievableTerms = new IntArraySet();
             final IntArraySet deletableTerms = new IntArraySet();
+            // Condizioni numeriche che l'azione può migliorare (o sconosciute -> perseguibili)
             for (final int t : getAllComparisons()) {
                 final float v = this.numericContribution(actionId, (Comparison) Terminal.getTerminal(t));
                 if (v > 0 || v == UNKNOWNEFFECT) {
@@ -858,6 +1092,7 @@ public class H1 implements SearchHeuristic {
                         System.out.println("Numeric Contribution: " + v);
                     }
                 } else {
+                    // Se peggiora e sono attivi smart constraints, registra tra i deleters
                     if (v < 0 && useSmartConstraints) {
                         if (DEBUG) {
                             System.out.print(Transition.getTransition(actionId) + " worsens");
@@ -868,6 +1103,7 @@ public class H1 implements SearchHeuristic {
                     }
                 }
             }
+            // Parte proposizionale: intersezione tra allConditions e effetti proposizionali dell'azione
             Sets.SetView<Integer> intersection = Sets.intersection(getAllConditions(), (Set<Integer>)cp.propEffectFunction()[actionId]);
             achievableTerms.addAll(intersection);
             for (final int o : intersection) {
@@ -881,31 +1117,40 @@ public class H1 implements SearchHeuristic {
         return getConditionsAchievableBy()[actionId];
     }
 
-   
-
+    /**
+     * Numero di ripetizioni di un'azione con contributo v necessario
+     * per portare a vero un confronto numerico Terminal t nello stato s.
+     */
     private float computeRepetition(Terminal t, double v, State s) {
         final double eval = ((Comparison) t).getLeft().eval(s);
         if (Double.isNaN(eval)){
             return 1.0f;
         }
+        // Se confronto è stretto e sommiamo (h_add), proteggiamo da arrotondamenti
         if (((Comparison) t).isStrict && this.isAdditive()){
             return (float) (-1f * eval / v)+Float.MIN_VALUE;
         }
         return (float) (-1f * eval / v);
     }
 
-
-
+    /**
+     * Hook per memorizzare info locali sul costo (usato in classi derivate).
+     */
     protected void cacheValue(float rep, int actionId, Terminal t) {
-        
+
     }
 
+    /**
+     * Hook per gestire aggiornamenti aggiuntivi (usato in classi derivate).
+     */
     protected boolean update(Terminal t, boolean update, int actionId) {
         return update;
     }
 
+    // -------------------------- Getters/utility -------------------------------
+
     /**
-     * @return the allAchievers
+     * @return allAchievers (allocato on-demand se nullo)
      */
     public IntArraySet[] getAllAchievers() {
         if (allAchievers == null){
@@ -914,144 +1159,235 @@ public class H1 implements SearchHeuristic {
         return allAchievers;
     }
 
-    /**
-     * @return the totNumberOfTerms
-     */
     public int getTotNumberOfTerms() {
         return totNumberOfTerms;
     }
 
-    /**
-     * @return the totNumberOfTermsRefactored
-     */
     public int getTotNumberOfTermsRefactored() {
         return totNumberOfTermsRefactored;
     }
 
-    /**
-     * @return the problem
-     */
     public PDDLProblem getProblem() {
         return problem;
     }
 
-    /**
-     * @return the helpfulActionsComputation
-     */
     public boolean isHelpfulActionsComputation() {
         return helpfulActionsComputation;
     }
 
-    /**
-     * @return the conditionsAchievableBy
-     */
     public IntArraySet[] getConditionsAchievableBy() {
         return conditionsAchievableBy;
     }
 
-    /**
-     * @return the conditionsDeletableBy
-     */
     public IntArraySet[] getConditionsDeletableBy() {
         return conditionsDeletableBy;
     }
 
-    /**
-     * @return the conditionToAction
-     */
     public IntArraySet[] getConditionToAction() {
         return conditionToAction;
     }
 
-    /**
-     * @return the allConditions
-     */
     public IntArraySet getAllConditions() {
         return allConditions;
     }
-    
-        /**
-     * @return the reachableAchievers
-     */
+
     public IntArraySet[] getReachableAchievers() {
         return allAchievers;
     }
 
-    /**
-     * @return the allComparisons
-     */
     public IntArraySet getAllComparisons() {
         return allComparisons;
     }
 
-    /**
-     * @return the nodeOf
-     */
     public FibonacciHeapNode[] getNodeOf() {
         return nodeOf;
     }
 
-    /**
-     * @return the reachability
-     */
     public boolean isReachability() {
         return reachability;
     }
 
-    /**
-     * @return the conjunctionsMax
-     */
     public boolean isConjunctionsMax() {
         return conjunctionsMax;
     }
 
-    /**
-     * @return the actionCost
-     */
     public float[] getActionCost() {
         return cp.actionCost();
     }
 
-    /**
-     * @return the actionHCost
-     */
     public float[] getActionHCost() {
         return actionHCost;
     }
 
-    /**
-     * @return the conditionCost
-     */
     public float[] getConditionCost() {
         return conditionCost;
     }
 
-    /**
-     * @return the closed
-     */
     public boolean[] getClosed() {
         return closed;
     }
 
-    /**
-     * @return the additive
-     */
     public boolean isAdditive() {
         return additive;
     }
 
-    /**
-     * @return the conditionInit
-     */
     public boolean[] getConditionInit() {
         return conditionInit;
     }
 
-    /**
-     * @return the actionInit
-     */
     public boolean[] getActionInit() {
         return actionInit;
+    }
+
+    private void computeInterferenceFree() {
+        this.indirectAchievers = calculateIndirectAchievers();
+        this.isDomainInterferenceFree = isProblemInterferenceFree(this.indirectAchievers);
+    }
+
+    private IntArraySet[] calculateIndirectAchievers() {
+        // definisco un array di IntArraySet
+        IntArraySet[] iAch = new IntArraySet[totNumberOfTerms];     // numero totale di termini/condizioni
+
+        // inizializzo iAch con gli achievers diretti (ach)
+        for (int psiId : allComparisons) {
+            // allAchievers[psiId] contiene tutti gli achievers diretti di psi
+            iAch[psiId] = new IntArraySet(allAchievers[psiId]);
+        }
+
+        boolean changes = true;
+        // propagazione all'indietro, continua finché in un'iterazione vengono aggiunte nuove azioni
+        while (changes) {
+            changes = false;
+
+
+            for (int psiId : allComparisons) {
+                // copia per l'iterazione, per non modificare l'insieme mentre viene iterato
+                IntArraySet currentIAch = new IntArraySet(iAch[psiId]);
+
+                // per ogni azione a' che è un IAch(psi)
+                for (int aPrimeId : currentIAch) {
+                    // si esaminano tutte le precondizioni di a'
+                    IntSet preconditionTerminals = actionPreconditionTerminals[aPrimeId];
+
+                    // Per ogni terminale t nella precondizione di a'
+                    for (int tId : preconditionTerminals) {
+                        // allAchievers[tId] contiene Ach(t)
+                        // sono le azioni 'a' che soddisfano: a in Ach(pre(a'))
+                        IntArraySet directAchieversOfT = allAchievers[tId];
+
+                        // se directAchieversOfT è null/vuoto, interrompo l'iterazione
+                        if (directAchieversOfT == null) continue;
+
+                        for (int aId : directAchieversOfT) {
+                            // Se 'a' non è ancora in IAch(psi), lo aggiungo
+                            if (!iAch[psiId].contains(aId)) {
+                                iAch[psiId].add(aId);
+                                changes = true;
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        // quando un ciclo completo non aggiunge più nuove azioni a nessun insieme
+        return iAch;
+    }
+
+    /**
+     * Verifica se l'azione a_i interferisce con a_j.
+     * Restituisce l'id della condizione numerica che causa l'interferenza,
+     * o -1 se non c'è interferenza.
+     */
+    private int findInterferingNumericCondition(int aiId, int ajId, IntArraySet[] indirectAchievers) {
+        if (aiId == ajId) return -1; // L'interferenza è solo tra azioni distinte
+
+        // 1 - a_i in IAch(pre(a_j))
+        boolean aiIsIndirectAchieverForAnyPrecond = false;
+        IntSet ajPreconditions = actionPreconditionTerminals[ajId];
+
+        // cerco se esiste una condizione psi' in pre(a_j) tale che a_i sia in IAch(psi')
+        for (int psiId : allComparisons) {
+            if (ajPreconditions.contains(psiId)) {
+                if (indirectAchievers[psiId] != null && indirectAchievers[psiId].contains(aiId)) {
+                    aiIsIndirectAchieverForAnyPrecond = true;
+                    break;
+                }
+            }
+        }
+
+        if (!aiIsIndirectAchieverForAnyPrecond) {
+            return -1;      // se fallisce la condizione 1, non può esserci interferenza
+        }
+
+        // se la condizione 1 è soddisfatta, cerco una psi che soddisfi le condizioni 2 e 3
+        for (int psiId : allComparisons) {
+            // 2 - a_i appartiene ad Ach(psi)
+            boolean cond2 = allAchievers[psiId] != null && allAchievers[psiId].contains(aiId);
+
+            // 3 - a_j appartiene ad Ach(psi)
+            boolean cond3 = allAchievers[psiId] != null && allAchievers[psiId].contains(ajId);
+
+            // se tutte le 3 condizioni sono vere, c'è interferenza su psi
+            if (cond2 && cond3) {
+                return psiId;   // interferenza trovata
+            }
+        }
+
+        return -1; // nessuna condizione trovata per condizioni 2 e 3
+    }
+
+
+    /**
+     * Valuta se il problema è interference-free
+     * Un dominio è IF se per ogni coppia a_i, a_j:
+     * SE a_i interferisce con a_j, ALLORA pre(a_i) implica pre(a_j)
+     */
+    private boolean isProblemInterferenceFree(IntArraySet[] indirectAchievers) {
+        // itera su tutte le coppie di azioni distinte (ai, aj)
+        for (int aiId : allActions) {
+            for (int ajId : allActions) {
+                if (aiId == ajId) {
+                    continue;
+                }
+
+                // controlla se a_i interferisce con a_j
+                int interferingPsiId = findInterferingNumericCondition(aiId, ajId, indirectAchievers);
+
+                // se a_i interferisce con a_j
+                if (interferingPsiId != -1) {
+
+                    // verifico la condizione di Interference-Free: pre(a_i) implica pre(a_j)
+                    if (!checkPreconditionImplication(aiId, ajId)) {
+                        return false;
+                    }
+                }
+            }
+        }
+
+        // se tutte le coppie hanno soddisfatto la condizione, il dominio è interference-free
+        return true;
+    }
+
+    /**
+     * Verifica se pre(a_i) implica logicamente pre(a_j)
+     */
+    private boolean checkPreconditionImplication(int aiId, int ajId) {
+        // usa i set di id terminali pre-calcolati
+        final IntSet pre_ai_terminals = actionPreconditionTerminals[aiId];
+        final IntSet pre_aj_terminals = actionPreconditionTerminals[ajId];
+
+        // un insieme vuoto (pre_aj) è sottoinsieme di qualsiasi altro insieme (pre_ai)
+        if (pre_aj_terminals.isEmpty()) {
+            return true;
+        }
+
+        // un insieme non vuoto (pre_aj) non può essere sottoinsieme di uno vuoto (pre_ai)
+        if (pre_ai_terminals.isEmpty()) {
+            return false;
+        }
+
+        return pre_ai_terminals.containsAll(pre_aj_terminals);
     }
 
 
