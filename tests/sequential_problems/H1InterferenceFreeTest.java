@@ -7,6 +7,12 @@ import static org.junit.Assert.*;
 
 public class H1InterferenceFreeTest {
 
+    /**
+     * Verifica il comportamento delle euristiche hadd e hmax su un dominio
+     * specificamente progettato per essere Interference-Free.
+     * In un dominio IF, teoricamente hadd dovrebbe eguagliare hmax.
+     * Vengono anche verificate le stime e la dimensione del piano ottimale.
+     */
     @Test
     public void testH1OnIFDomain() throws Exception {
         PlannerUtils pu = new PlannerUtils();
@@ -25,6 +31,12 @@ public class H1InterferenceFreeTest {
         assertEquals("On IF example, expected optimal plan size = 3", 3, planSize);
     }
 
+    /**
+     * Verifica il comportamento delle euristiche hadd e hmax su un dominio
+     * che non è Interference-Free
+     * In questi domini, si verifica la relazione standard hadd >= hmax.
+     * Vengono anche verificate le stime e la dimensione del piano ottimale.
+     */
     @Test
     public void testH1OnNonIFDomain() throws Exception {
         PlannerUtils pu = new PlannerUtils();
@@ -43,6 +55,11 @@ public class H1InterferenceFreeTest {
         assertEquals("On non-IF example, expected optimal plan size = 3", 3, planSize);
     }
 
+    /**
+     * Test di regressione su car_linear_mt_sc)
+     * Verifica la relazione hadd >= hmax e la correttezza del calcolo hrmax.
+     * Controlla la dimensione del piano ottimale.
+     */
     @Test
     public void testH1OnProcessesDomain() throws Exception {
         PlannerUtils pu = new PlannerUtils();
@@ -63,6 +80,10 @@ public class H1InterferenceFreeTest {
         assertEquals("On Processes example, expected optimal plan size = 27", 27, planSize);
     }
 
+    /**
+     * Test di regressione sul benchmark classico Gripper.
+     * Verifica la relazione hadd >= hmax e la dimensione del piano ottimale.
+     */
     @Test
     public void testH1OnGripper() throws Exception {
         PlannerUtils pu = new PlannerUtils();
@@ -81,6 +102,10 @@ public class H1InterferenceFreeTest {
         assertEquals("On Gripper example, expected optimal plan size = 19", 19, planSize);
     }
 
+    /**
+     * Test di regressione sul benchmark classico Blocks World.
+     * Verifica la relazione hadd >= hmax e la dimensione del piano ottimale.
+     */
     @Test
     public void testH1OnBlocks() throws Exception {
         PlannerUtils pu = new PlannerUtils();
@@ -99,6 +124,10 @@ public class H1InterferenceFreeTest {
         assertEquals("On Blocks example, expected optimal plan size = 6", 6, planSize);
     }
 
+    /**
+     * Test di regressione su un dominio che fa uso di quantificazione e condizioni.
+     * Verifica la relazione hadd >= hmax e la dimensione del piano ottimale.
+     */
     @Test
     public void testH1OnQuantificationConditional() throws Exception {
         PlannerUtils pu = new PlannerUtils();
@@ -117,6 +146,10 @@ public class H1InterferenceFreeTest {
         assertEquals("On Quantification/Conditional example, expected optimal plan size = 1", 1, planSize);
     }
 
+    /**
+     * Test di regressione su una grande istanza del benchmark Depots.
+     * Verifica la relazione hadd >= hmax e la dimensione del piano ottimale.
+     */
     @Test
     public void testH1OnDepotsBig() throws Exception {
         PlannerUtils pu = new PlannerUtils();
@@ -135,6 +168,10 @@ public class H1InterferenceFreeTest {
         assertEquals("Su DepotsBig, attesa una dimensione ottimale del piano", 26, planSize);
     }
 
+    /**
+     * Test di regressione sul benchmark ZenoTravel per le euristiche.
+     * Verifica la relazione hadd >= hmax e la dimensione del piano ottimale.
+     */
     @Test
     public void testH1OnZenoTravelHeuristics() throws Exception {
         PlannerUtils pu = new PlannerUtils();
@@ -153,6 +190,10 @@ public class H1InterferenceFreeTest {
         assertEquals("Su ZenoTravel, attesa una dimensione ottimale del piano", 9, planSize);
     }
 
+    /**
+     * Test di regressione su un'istanza del benchmark Settlers.
+     * Verifica la relazione hadd >= hmax.
+     */
     @Test
     public void testH1OnSettlers() throws Exception {
         PlannerUtils pu = new PlannerUtils();
@@ -167,6 +208,11 @@ public class H1InterferenceFreeTest {
         assertTrue("Su Settlers, atteso hadd >= hmax", hadd >= hmax);
     }
 
+    /**
+     * Test di regressione su un dominio con espressioni numeriche complesse.
+     * Verifica la correttezza del calcolo delle euristiche hadd e hmax (incluso hadd >= hmax)
+     * in presenza di funzionalità PDDL avanzate.
+     */
     @Test
     public void testH1OnComplexExpressions() throws Exception {
         PlannerUtils pu = new PlannerUtils();
@@ -181,6 +227,11 @@ public class H1InterferenceFreeTest {
         assertTrue("In generale, su stessa istanza, vale hadd >= hmax", hadd >= hmax);
     }
 
+    /**
+     * Test di regressione su un dominio che include funzioni trigonometriche.
+     * Verifica la correttezza del calcolo delle euristiche hadd e hmax (incluso hadd >= hmax)
+     * e la dimensione del piano ottimale.
+     */
     @Test
     public void testH1OnTrigonometricFunctions() throws Exception {
         PlannerUtils pu = new PlannerUtils();
