@@ -44,7 +44,11 @@ import java.util.*;
 import org.jgrapht.alg.util.Pair;
 import org.jgrapht.util.FibonacciHeap;
 import org.jgrapht.util.FibonacciHeapNode;
-
+import java.util.HashMap;
+import java.util.Map;
+import java.util.Set;
+import java.util.AbstractMap;
+import java.util.Map.Entry;
 /**
  * Implementazione di una euristica in stile h_add/h_max su un grafo rilassato.
  *
@@ -1241,22 +1245,33 @@ public class H1 implements SearchHeuristic {
 
     private void computeInterferenceFree() {
         this.indirectAchievers = calculateIndirectAchievers();
-        this.isDomainInterferenceFree = isProblemInterferenceFree(this.indirectAchievers);
+        this.isDomainInterferenceFree = isProblemInterferenceFree();
     }
+
+
+    /**
+     * Metodo per creare una chiave Entry<Integer, Integer> simmetrica.
+     * Questo assicura che (aiId, ajId) e (ajId, aiId) generino la stessa chiave
+     */
+    private Entry<Integer, Integer> getSymmetricKey(int a, int b) {
+        int key1 = Math.min(a, b);
+        int key2 = Math.max(a, b);
+        // SimpleImmutableEntry garantisce un hash code e un equals corretti per la mappa
+        return new AbstractMap.SimpleImmutableEntry<>(key1, key2);
+    }
+
 
     /**
      * Calcola gli Indirect Achievers (IAch) per tutte le condizioni numeriche (Comparison).
-     * IAch(psi) è l'insieme di azioni a che sono Ach(t) per qualche t in pre(a') e a' in IAch(psi).
+     * Ottimizzato per evitare la creazione di snapshot completi ad ogni iterazione.
      */
     private IntArraySet[] calculateIndirectAchievers() {
-        // Inizializza l'array per IAch(psi)
-        final IntArraySet[] indirectAchievers = new IntArraySet[totNumberOfTerms];
+        // 1. inizializzazione con gli Achievers diretti (Ach)
         final IntArraySet[] directAchievers = getAllAchievers();
+        final IntArraySet[] indirectAchievers = new IntArraySet[totNumberOfTerms];
 
-        // inizializzo IAch con gli Achievers diretti (Ach) solo per le Comparison
         for (int comparisonId : allComparisons) {
             IntArraySet direct = directAchievers[comparisonId];
-            // uso una copia per inizializzare il set, garantendo che sia un IntArraySet non nullo
             indirectAchievers[comparisonId] = (direct == null) ? new IntArraySet() : new IntArraySet(direct);
         }
 
@@ -1266,99 +1281,131 @@ public class H1 implements SearchHeuristic {
             changes = false;
 
             for (int comparisonId : allComparisons) {
-                // copia degli IAch correnti per l'iterazione,
-                // così da poter modificare l'insieme originale (indirectAchievers[comparisonId])
-                // senza problemi di concorrenza.
                 final IntSet currentIAch = indirectAchievers[comparisonId];
                 if (currentIAch == null || currentIAch.isEmpty()) continue;
 
-                final IntArraySet achSnapshot = new IntArraySet(currentIAch);
+                // set temporaneo per tracciare le nuove aggiunte
+                final IntArraySet newAdditions = new IntArraySet();
 
-                // per ogni azione a' che è un IAch(psi)
-                for (int aPrimeId : achSnapshot) {
-
-                    // per ogni terminale t nella precondizione di a'
+                // itera sull'IAch corrente (a')
+                for (int aPrimeId : currentIAch) {
                     final IntSet precondTerminals = actionPreconditionTerminals[aPrimeId];
                     if (precondTerminals == null || precondTerminals.isEmpty()) continue;
 
                     // per ogni terminale t in pre(a')
                     for (int terminalId : precondTerminals) {
-
-                        // ottengo gli achievers diretti di t (Ach(t))
                         final IntArraySet achieversOfTerminal = directAchievers[terminalId];
                         if (achieversOfTerminal == null) continue;
 
                         // per ogni azione a in Ach(t)
                         for (int aId : achieversOfTerminal) {
-                            // aggiungi a a IAch(comparisonId) se non è già presente
+                            // aggiungi se non è già presente in IAch(comparisonId)
                             if (!currentIAch.contains(aId)) {
-                                currentIAch.add(aId);
-                                changes = true;
+                                newAdditions.add(aId);
                             }
                         }
                     }
                 }
+
+                // Aggiorna l'insieme originale solo con le nuove aggiunte
+                if (!newAdditions.isEmpty()) {
+                    currentIAch.addAll(newAdditions);
+                    changes = true;
+                }
             }
         }
 
-        // quando un ciclo completo non aggiunge più nuove azioni a nessun insieme
         return indirectAchievers;
     }
 
 
     /**
-     * Verifica se l'azione a_i interferisce con a_j (numerica).
-     * Interferenza esiste SE:
-     * 1. a_i è in IAch(psi') per qualche psi' in pre(a_j) (a_i contribuisce a una precondizione numerica di a_j)
-     * 2. Esiste una Comparison psi tale che a_i in Ach(psi) E a_j in Ach(psi)
-     * Restituisce l'id della condizione numerica che causa l'interferenza,
-     * o -1 se non c'è interferenza.
-      */
-    private int findInterferingNumericCondition(int aiId, int ajId, IntArraySet[] indirectAchievers) {
+     * Pre-calcola tutte le coppie di azioni (a_i, a_j) che sono Achievers diretti (Ach)
+     * per la stessa condizione numerica psi (Condizione 2 della Def. 5).
+     * Restituisce: Mappa da coppia di Azioni (simmetrica) all'ID della psi che le fa co-achieve.
+     */
+    private Map<Entry<Integer, Integer>, Integer> precomputeCoAchievers(IntArraySet[] directAchievers) {
+        Map<Entry<Integer, Integer>, Integer> coAchievers = new HashMap<>();
+
+        for (int psiId : allComparisons) {
+            final IntArraySet achievers = directAchievers[psiId];
+            if (achievers == null || achievers.size() < 2) continue;
+
+            // converte in array per iterare in modo efficiente
+            int[] achArray = achievers.toIntArray();
+
+            // itera su tutte le coppie di achievers (a_i, a_j) per questa psi
+            for (int i = 0; i < achArray.length; i++) {
+                for (int j = i + 1; j < achArray.length; j++) {
+                    int aiId = achArray[i];
+                    int ajId = achArray[j];
+
+                    // usa il metodo helper per creare la chiave simmetrica
+                    Entry<Integer, Integer> pair = getSymmetricKey(aiId, ajId);
+
+                    // mappa la coppia al primo psi trovato
+                    if (!coAchievers.containsKey(pair)) {
+                        coAchievers.put(pair, psiId);
+                    }
+                }
+            }
+        }
+        return coAchievers;
+    }
+
+
+    /**
+     * Verifica se l'azione a_i interferisce con a_j (numerica)
+     * Lookup veloce per la Condizione 2.
+     */
+    private int findInterferingNumericCondition(int aiId, int ajId,
+                                                IntArraySet[] indirectAchievers,
+                                                Map<Entry<Integer, Integer>, Integer> coAchieversMap) {
         if (aiId == ajId) return -1;
 
-        final IntSet ajPreconditions = actionPreconditionTerminals[ajId];
-        // se a_j non ha precondizioni, non può esserci interferenza sul pre(a_j)
-        if (ajPreconditions == null || ajPreconditions.isEmpty()) return -1;
-
-        // 1. controllo se a_i è un IAch per qualsiasi precondizione numerica di a_j
+        // 1. a_i in IAch(psi') per qualche psi' in pre(a_j)
         boolean aiIsIndirectAchiever = false;
-        for (int precondId : ajPreconditions) {
-            // considero solo le precondizioni numeriche che sono iAch
-            if (allComparisons.contains(precondId)) {
-                IntSet iAchSet = indirectAchievers[precondId];
-                if (iAchSet != null && iAchSet.contains(aiId)) {
-                    aiIsIndirectAchiever = true;
-                    break;
+        final IntSet ajPreconditions = actionPreconditionTerminals[ajId];
+
+        if (ajPreconditions != null) {
+            for (int precondId : ajPreconditions) {
+                if (allComparisons.contains(precondId)) {
+                    IntSet iAchSet = indirectAchievers[precondId];
+                    if (iAchSet != null && iAchSet.contains(aiId)) {
+                        aiIsIndirectAchiever = true;
+                        break;
+                    }
                 }
             }
         }
 
         if (!aiIsIndirectAchiever) {
-            return -1; // se fallisce la condizione 1
+            return -1; // fallisce la Condizione 1
         }
 
-        // 2. se la condizione 1 è soddisfatta, cerco una Comparison psi tale che a_i in Ach(psi) E a_j in Ach(psi)
-        final IntArraySet[] directAchievers = getAllAchievers();
+        // 2. esiste psi tale che a_i in Ach(psi) E a_j in Ach(psi)
 
-        for (int psiId : allComparisons) {
-            final IntArraySet achievers = directAchievers[psiId];
+        // crea la chiave simmetrica
+        Entry<Integer, Integer> pair = getSymmetricKey(aiId, ajId);
 
-            if (achievers != null && achievers.contains(aiId) && achievers.contains(ajId)) {
-                return psiId; // Interferenza trovata
-            }
-        }
+        // cerca nella mappa pre-calcolata
+        Integer psiId = coAchieversMap.get(pair);
 
-        return -1; // Nessuna interferenza
+        return (psiId != null) ? psiId : -1;
     }
 
 
     /**
      * Valuta se il problema è interference-free
-     * Un dominio è IF se per ogni coppia a_i, a_j:
-     * SE a_i interferisce con a_j, ALLORA pre(a_i) implica pre(a_j)
      */
-    private boolean isProblemInterferenceFree(IntArraySet[] indirectAchievers) {
+    private boolean isProblemInterferenceFree() {
+        // calcola le dipendenze una sola volta
+        final IntArraySet[] directAchievers = getAllAchievers();
+        final IntArraySet[] indirectAchievers = calculateIndirectAchievers();
+
+        // pre-calcolo usando Map.Entry
+        final Map<Entry<Integer, Integer>, Integer> coAchieversMap = precomputeCoAchievers(directAchievers);
+
         // itera su tutte le coppie di azioni distinte (a_i, a_j)
         for (int aiId : allActions) {
             for (int ajId : allActions) {
@@ -1366,8 +1413,8 @@ public class H1 implements SearchHeuristic {
                     continue;
                 }
 
-                // controlla se a_i interferisce con a_j
-                int interferingPsiId = findInterferingNumericCondition(aiId, ajId, indirectAchievers);
+                // 1. controlla se a_i interferisce con a_j
+                int interferingPsiId = findInterferingNumericCondition(aiId, ajId, indirectAchievers, coAchieversMap);
 
                 // se a_i interferisce con a_j
                 if (interferingPsiId != -1) {
@@ -1380,13 +1427,11 @@ public class H1 implements SearchHeuristic {
             }
         }
 
-        // se tutte le coppie hanno soddisfatto la condizione, il dominio è interference-free
         return true;
     }
 
     /**
      * Verifica se la precondizione di a_i implica logicamente la precondizione di a_j.
-     * L'implicazione Pre(A) => Pre(B) è soddisfatta se e solo se Pre(B) è un sottoinsieme di Pre(A).
      */
     private boolean checkPreconditionImplication(int aiId, int ajId) {
         // pre(a_i)
@@ -1394,7 +1439,7 @@ public class H1 implements SearchHeuristic {
         // pre(a_j)
         final IntSet pre_aj_terminals = actionPreconditionTerminals[ajId];
 
-        // se pre(a_j) è vuoto, è implicato da qualsiasi pre(a_i)
+        // se pre(a_j) è vuoto, è sempre implicato.
         if (pre_aj_terminals == null || pre_aj_terminals.isEmpty()) {
             return true;
         }
@@ -1404,8 +1449,7 @@ public class H1 implements SearchHeuristic {
             return false;
         }
 
-        // verifica se pre(a_j) è un sottoinsieme di pre(a_i)
+        // verifica se pre(a_j) è un sottoinsieme di pre(a_i) (uso di containsAll)
         return pre_ai_terminals.containsAll(pre_aj_terminals);
     }
-
 }
