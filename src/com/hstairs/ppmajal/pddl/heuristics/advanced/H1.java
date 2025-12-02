@@ -1406,7 +1406,6 @@ public class H1 implements SearchHeuristic {
      * Valuta se il problema è interference-free
      */
     private boolean isProblemInterferenceFree() {
-        // assicuro che gli achievers siano popolati
         ensureAchieversComputed();
         // calcola le dipendenze una sola volta
         final IntArraySet[] directAchievers = getAllAchievers();
@@ -1417,19 +1416,41 @@ public class H1 implements SearchHeuristic {
 
         // itera su tutte le coppie di azioni distinte (a_i, a_j)
         for (int aiId : allActions) {
+            // Salta se a_i è l'azione Goal fittizia
+            if (isGoalAction(aiId)) {
+                continue;
+            }
+
             for (int ajId : allActions) {
+                // Salta se a_j è l'azione Goal fittizia
+                if (isGoalAction(ajId)) {
+                    continue;
+                }
+
                 if (aiId == ajId) {
                     continue;
                 }
 
-                // 1. controlla se a_i interferisce con a_j
+                // 1. controlla se a_i interferisce con a_j (Def. 5)
                 int interferingPsiId = findInterferingCondition(aiId, ajId, indirectAchievers, coAchieversMap);
 
                 // se a_i interferisce con a_j
                 if (interferingPsiId != -1) {
 
-                    // verifico la condizione di Interference-Free: pre(a_i) implica pre(a_j)
+                    // verifico la condizione di Interference-Free: pre(a_i) implica pre(a_j) (Def. 6)
                     if (!checkPreconditionImplication(aiId, ajId)) {
+                        System.out.println("VIOLAZIONE IF RILEVATA (Def.5 + Def.6):");
+                        System.out.println("  Coppia azioni: (" + formatAction(aiId) + ", " + formatAction(ajId) + ") [" + aiId + ", " + ajId + "]");
+                        System.out.println("  Psi co-achieved: " + formatTerminal(interferingPsiId) + " [id=" + interferingPsiId + "]");
+                        // prova a trovare almeno una precondizione di aj per cui ai ∈ IAch(pre(aj))
+                        String preWithIAch = findOneIndirectPrecondition(aiId, ajId);
+                        if (preWithIAch != null) {
+                            System.out.println("  Ai è in IAch di una precondizione di aj: " + preWithIAch);
+                        }
+                        // dettaglio precondizioni
+                        System.out.println("  pre(ai): " + formatPreconditions(aiId));
+                        System.out.println("  pre(aj): " + formatPreconditions(ajId));
+                        System.out.println("  Violazione (Def. 6): pre(ai) NON implica pre(aj)");
                         return false;
                     }
                 }
@@ -1439,6 +1460,11 @@ public class H1 implements SearchHeuristic {
                 //    pre(a_i) => pre(a_j)
                 if (affectsAnyPrecondition(aiId, ajId)) {
                     if (!checkPreconditionImplication(aiId, ajId)) {
+                        System.out.println("VIOLAZIONE IF RILEVATA (Effetto diretto su precondizione):");
+                        System.out.println("  Coppia azioni: (" + formatAction(aiId) + ", " + formatAction(ajId) + ") [" + aiId + ", " + ajId + "]");
+                        System.out.println("  Precondizioni numeriche di aj peggiorate da ai:");
+                        System.out.println("  pre(ai): " + formatPreconditions(aiId));
+                        System.out.println("  pre(aj): " + formatPreconditions(ajId));
                         return false;
                     }
                 }
@@ -1453,6 +1479,11 @@ public class H1 implements SearchHeuristic {
                     boolean psiRequired = (pre_ai != null && pre_ai.contains(psiId)) || (pre_aj != null && pre_aj.contains(psiId));
                     if (psiRequired) {
                         if (!checkPreconditionImplication(aiId, ajId)) {
+                            System.out.println("VIOLAZIONE IF RILEVATA (Co-achievers su ψ che è anche precondizione):");
+                            System.out.println("  Coppia azioni: (" + formatAction(aiId) + ", " + formatAction(ajId) + ") [" + aiId + ", " + ajId + "]");
+                            System.out.println("  ψ: " + formatTerminal(psiId) + " [id=" + psiId + "] è richiesta come precondizione da almeno una delle due azioni");
+                            System.out.println("  pre(ai): " + formatPreconditions(aiId));
+                            System.out.println("  pre(aj): " + formatPreconditions(ajId));
                             return false;
                         }
                     }
@@ -1495,6 +1526,57 @@ public class H1 implements SearchHeuristic {
         // verifica se pre(a_j) è un sottoinsieme di pre(a_i) (uso di containsAll)
         return pre_ai_terminals.containsAll(pre_aj_terminals);
     }
+
+    private boolean isGoalAction(int actionId) {
+        final int lastActionId = allActions.size() - 1;
+
+        return actionId == lastActionId;
+    }
+
+    private String formatAction(int aId) {
+        try {
+            if (aId == cp.goal()) return "GOAL";
+            return String.valueOf(Transition.getTransition(cp.cpTr2TrMap()[aId]));
+        } catch (Throwable t) {
+            return "Action#" + aId;
+        }
+    }
+
+    private String formatTerminal(int termId) {
+        try {
+            return String.valueOf(Terminal.getTerminal(termId));
+        } catch (Throwable t) {
+            return "Terminal#" + termId;
+        }
+    }
+
+    private String formatPreconditions(int aId) {
+        final IntSet pre = actionPreconditionTerminals[aId];
+        if (pre == null || pre.isEmpty()) return "{}";
+        StringBuilder sb = new StringBuilder("{");
+        boolean first = true;
+        for (int t : pre) {
+            if (!first) sb.append(", ");
+            sb.append(formatTerminal(t)).append("[id=").append(t).append("]");
+            first = false;
+        }
+        sb.append('}');
+        return sb.toString();
+    }
+
+    private String findOneIndirectPrecondition(int aiId, int ajId) {
+        if (indirectAchievers == null) return null;
+        final IntSet pre_aj = actionPreconditionTerminals[ajId];
+        if (pre_aj == null || pre_aj.isEmpty()) return null;
+        for (int preId : pre_aj) {
+            IntSet iAch = indirectAchievers[preId];
+            if (iAch != null && iAch.contains(aiId)) {
+                return formatTerminal(preId) + "[id=" + preId + "]";
+            }
+        }
+        return null;
+    }
+
 
     /**
      * Verifica se l'azione a_i ha un effetto potenzialmente interferente su almeno una
