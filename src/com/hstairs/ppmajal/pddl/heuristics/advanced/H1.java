@@ -33,7 +33,6 @@ import com.hstairs.ppmajal.extraUtils.ArrayShifter;
 import com.hstairs.ppmajal.PDDLProblem.PDDLProblem;
 import com.hstairs.ppmajal.problem.State;
 import com.hstairs.ppmajal.search.SearchHeuristic;
-import com.hstairs.ppmajal.transition.ConditionalEffects;
 import com.hstairs.ppmajal.transition.Transition;
 import static com.hstairs.ppmajal.transition.Transition.getTransition;
 import com.hstairs.ppmajal.transition.TransitionGround;
@@ -362,26 +361,30 @@ public class H1 implements SearchHeuristic {
         // Itera su ogni terminale trovato
         for (final Condition c : terminalConditions) {
             if (c instanceof Terminal) {
-                final Terminal t = (Terminal) c;
-
-                // Aggiunge l'id del terminale all'insieme specifico di questa azione.
-                // lo uso dopo per controllare l'implicazione??
-                // La funzione scorre la precondizione di un'azione a_i.
-                // Registra tutti i terminali in actionPreconditionTerminals[i] (mappa diretta).
-                actionPreconditionTerminals[i].add(t.getId());
-
-                IntArraySet groundActions = getConditionToAction()[((Terminal) c).getId()];
-                if (groundActions == null) {
-                    groundActions = new IntArraySet();
-                }
-                groundActions.add(i);
-                // usa gli stessi terminali per popolare conditionToAction[t.getId()
-                conditionToAction[t.getId()] = groundActions;
-                getAllConditions().add(((Terminal) c).getId());
+                // Se è un confronto numerico, usa l'id normalizzato ovunque per coerenza
                 if (c instanceof Comparison) {
                     final Comparison normalize = (Comparison) c.normalize();
-                    // Salviamo solo l'id normalizzato per il set allComparisons
-                    getAllComparisons().add(normalize.getId());
+                    final int nid = normalize.getId();
+                    actionPreconditionTerminals[i].add(nid);
+                    IntArraySet groundActions = getConditionToAction()[nid];
+                    if (groundActions == null) {
+                        groundActions = new IntArraySet();
+                    }
+                    groundActions.add(i);
+                    conditionToAction[nid] = groundActions;
+                    getAllConditions().add(nid);
+                    getAllComparisons().add(nid);
+                } else {
+                    final Terminal t = (Terminal) c;
+                    final int tid = t.getId();
+                    actionPreconditionTerminals[i].add(tid);
+                    IntArraySet groundActions = getConditionToAction()[tid];
+                    if (groundActions == null) {
+                        groundActions = new IntArraySet();
+                    }
+                    groundActions.add(i);
+                    conditionToAction[tid] = groundActions;
+                    getAllConditions().add(tid);
                 }
             }
         }
@@ -741,9 +744,8 @@ public class H1 implements SearchHeuristic {
      * Memorizza l’azione come achiever (se necessario per relaxed plan/smart constraints).
      */
     protected void updateAchievers(int conditionId, int actionId) {
-        if (extractRelaxedPlan || useSmartConstraints || isHelpfulActionsComputation() ) {
-            getAchievers(conditionId).add(actionId);
-        }
+        // necessario anche per il controllo Interference-Free: popola sempre gli achievers
+        getAchievers(conditionId).add(actionId);
     }
 
     /**
@@ -1108,10 +1110,13 @@ public class H1 implements SearchHeuristic {
                 }
             }
             // Parte proposizionale: intersezione tra allConditions e effetti proposizionali dell'azione
-            Sets.SetView<Integer> intersection = Sets.intersection(getAllConditions(), (Set<Integer>)cp.propEffectFunction()[actionId]);
-            achievableTerms.addAll(intersection);
-            for (final int o : intersection) {
-                updateAchievers(o, actionId);
+            final Collection<Integer> propEff = cp.propEffectFunction()[actionId];
+            if (propEff != null && !propEff.isEmpty()) {
+                Sets.SetView<Integer> intersection = Sets.intersection(getAllConditions(), (Set<Integer>) propEff);
+                achievableTerms.addAll(intersection);
+                for (final int o : intersection) {
+                    updateAchievers(o, actionId);
+                }
             }
             conditionsAchievableBy[actionId] = achievableTerms;
             if (useSmartConstraints)
@@ -1243,9 +1248,13 @@ public class H1 implements SearchHeuristic {
         return actionInit;
     }
 
-    private void computeInterferenceFree() {
+    public boolean computeInterferenceFree() {
+        // Assicura che gli achievers diretti siano calcolati per tutte le azioni,
+        // altrimenti le strutture usate dal controllo IF restano vuote.
+        ensureAchieversComputed();
         this.indirectAchievers = calculateIndirectAchievers();
         this.isDomainInterferenceFree = isProblemInterferenceFree();
+        return isDomainInterferenceFree;
     }
 
 
@@ -1270,9 +1279,9 @@ public class H1 implements SearchHeuristic {
         final IntArraySet[] directAchievers = getAllAchievers();
         final IntArraySet[] indirectAchievers = new IntArraySet[totNumberOfTerms];
 
-        for (int comparisonId : allComparisons) {
-            IntArraySet direct = directAchievers[comparisonId];
-            indirectAchievers[comparisonId] = (direct == null) ? new IntArraySet() : new IntArraySet(direct);
+        for (int termId : getAllConditions()) {
+            IntArraySet direct = directAchievers[termId];
+            indirectAchievers[termId] = (direct == null) ? new IntArraySet() : new IntArraySet(direct);
         }
 
         boolean changes = true;
@@ -1280,8 +1289,8 @@ public class H1 implements SearchHeuristic {
         while (changes) {
             changes = false;
 
-            for (int comparisonId : allComparisons) {
-                final IntSet currentIAch = indirectAchievers[comparisonId];
+            for (int termId : getAllConditions()) {
+                final IntSet currentIAch = indirectAchievers[termId];
                 if (currentIAch == null || currentIAch.isEmpty()) continue;
 
                 // set temporaneo per tracciare le nuove aggiunte
@@ -1293,13 +1302,13 @@ public class H1 implements SearchHeuristic {
                     if (precondTerminals == null || precondTerminals.isEmpty()) continue;
 
                     // per ogni terminale t in pre(a')
-                    for (int terminalId : precondTerminals) {
-                        final IntArraySet achieversOfTerminal = directAchievers[terminalId];
+                    for (int preId : precondTerminals) {
+                        final IntArraySet achieversOfTerminal = directAchievers[preId];
                         if (achieversOfTerminal == null) continue;
 
                         // per ogni azione a in Ach(t)
                         for (int aId : achieversOfTerminal) {
-                            // aggiungi se non è già presente in IAch(comparisonId)
+                            // aggiungi se non è già presente in IAch(termId)
                             if (!currentIAch.contains(aId)) {
                                 newAdditions.add(aId);
                             }
@@ -1327,7 +1336,7 @@ public class H1 implements SearchHeuristic {
     private Map<Entry<Integer, Integer>, Integer> precomputeCoAchievers(IntArraySet[] directAchievers) {
         Map<Entry<Integer, Integer>, Integer> coAchievers = new HashMap<>();
 
-        for (int psiId : allComparisons) {
+        for (int psiId : getAllConditions()) {
             final IntArraySet achievers = directAchievers[psiId];
             if (achievers == null || achievers.size() < 2) continue;
 
@@ -1358,9 +1367,9 @@ public class H1 implements SearchHeuristic {
      * Verifica se l'azione a_i interferisce con a_j (numerica)
      * Lookup veloce per la Condizione 2.
      */
-    private int findInterferingNumericCondition(int aiId, int ajId,
-                                                IntArraySet[] indirectAchievers,
-                                                Map<Entry<Integer, Integer>, Integer> coAchieversMap) {
+    private int findInterferingCondition(int aiId, int ajId,
+                                         IntArraySet[] indirectAchievers,
+                                         Map<Entry<Integer, Integer>, Integer> coAchieversMap) {
         if (aiId == ajId) return -1;
 
         // 1. a_i in IAch(psi') per qualche psi' in pre(a_j)
@@ -1369,12 +1378,10 @@ public class H1 implements SearchHeuristic {
 
         if (ajPreconditions != null) {
             for (int precondId : ajPreconditions) {
-                if (allComparisons.contains(precondId)) {
-                    IntSet iAchSet = indirectAchievers[precondId];
-                    if (iAchSet != null && iAchSet.contains(aiId)) {
-                        aiIsIndirectAchiever = true;
-                        break;
-                    }
+                IntSet iAchSet = indirectAchievers[precondId];
+                if (iAchSet != null && iAchSet.contains(aiId)) {
+                    aiIsIndirectAchiever = true;
+                    break;
                 }
             }
         }
@@ -1399,6 +1406,8 @@ public class H1 implements SearchHeuristic {
      * Valuta se il problema è interference-free
      */
     private boolean isProblemInterferenceFree() {
+        // assicuro che gli achievers siano popolati
+        ensureAchieversComputed();
         // calcola le dipendenze una sola volta
         final IntArraySet[] directAchievers = getAllAchievers();
         final IntArraySet[] indirectAchievers = calculateIndirectAchievers();
@@ -1414,7 +1423,7 @@ public class H1 implements SearchHeuristic {
                 }
 
                 // 1. controlla se a_i interferisce con a_j
-                int interferingPsiId = findInterferingNumericCondition(aiId, ajId, indirectAchievers, coAchieversMap);
+                int interferingPsiId = findInterferingCondition(aiId, ajId, indirectAchievers, coAchieversMap);
 
                 // se a_i interferisce con a_j
                 if (interferingPsiId != -1) {
@@ -1424,10 +1433,44 @@ public class H1 implements SearchHeuristic {
                         return false;
                     }
                 }
+
+                // 2. se a_i influenza direttamente una precondizione
+                //    (proposizionale o numerica) di a_j, allora occorre comunque che
+                //    pre(a_i) => pre(a_j)
+                if (affectsAnyPrecondition(aiId, ajId)) {
+                    if (!checkPreconditionImplication(aiId, ajId)) {
+                        return false;
+                    }
+                }
+
+                // 3. se ai e aj co-achievano una psi e almeno uno dei due richiede psi come precondizione,
+                //    l'implicazione fra precondizioni deve essere vera (altrimenti dominio non-IF).
+                Entry<Integer, Integer> pair = getSymmetricKey(aiId, ajId);
+                Integer psiId = coAchieversMap.get(pair);
+                if (psiId != null) {
+                    final IntSet pre_ai = actionPreconditionTerminals[aiId];
+                    final IntSet pre_aj = actionPreconditionTerminals[ajId];
+                    boolean psiRequired = (pre_ai != null && pre_ai.contains(psiId)) || (pre_aj != null && pre_aj.contains(psiId));
+                    if (psiRequired) {
+                        if (!checkPreconditionImplication(aiId, ajId)) {
+                            return false;
+                        }
+                    }
+                }
             }
         }
 
         return true;
+    }
+
+    /**
+     * Popola gli achievers per tutte le azioni visitando gli effetti delle azioni.
+     */
+    private void ensureAchieversComputed() {
+        if (allActions == null || allActions.isEmpty()) return;
+        for (int aId : allActions) {
+            getConditionsAchievableById(aId);
+        }
     }
 
     /**
@@ -1451,5 +1494,31 @@ public class H1 implements SearchHeuristic {
 
         // verifica se pre(a_j) è un sottoinsieme di pre(a_i) (uso di containsAll)
         return pre_ai_terminals.containsAll(pre_aj_terminals);
+    }
+
+    /**
+     * Verifica se l'azione a_i ha un effetto potenzialmente interferente su almeno una
+     * precondizione di a_j. Per evitare falsi positivi:
+     * - non considera gli effetti proposizionali
+     * - Consideriamo solo precondizioni numeriche in cui il contributo di a_i peggiora (v < 0)
+     *   la soddisfacibilità del confronto richiesto da a_j
+     */
+    private boolean affectsAnyPrecondition(int aiId, int ajId) {
+        final IntSet pre_aj_terminals = actionPreconditionTerminals[ajId];
+        if (pre_aj_terminals == null || pre_aj_terminals.isEmpty()) return false;
+
+        // Solo parte numerica: se una precondizione numerica è peggiorata da a_i
+        for (int termId : pre_aj_terminals) {
+            if (allComparisons.contains(termId)) {
+                final Terminal t = Terminal.getTerminal(termId);
+                if (t instanceof Comparison cmp) {
+                    final float v = this.numericContribution(aiId, cmp);
+                    // Considera interferenza solo se peggiora la condizione richiesta
+                    if (!Float.isNaN(v) && v < 0f) return true;
+                }
+            }
+        }
+
+        return false;
     }
 }
