@@ -256,6 +256,9 @@ public class PDDLProblem implements SearchProblem {
         if (!"internal".equals(groundingMethod) && !"naive".equals(groundingMethod)) {
             System.out.println("Generate Transitions using " + groundingMethod);
             ExternalGrounder mff = null;
+            if (groundingMethod == null) {
+                throw new IllegalArgumentException("Grounding method cannot be null. Supported methods: metricff, fd, fdi, internal, naive");
+            }
             switch (groundingMethod) {
                 case "metricff":
                     mff = new MetricFFGrounder(this, this.linkedDomain.getPddlFilRef(), this.pddlFilRef);
@@ -266,6 +269,8 @@ public class PDDLProblem implements SearchProblem {
                 case "fdi":
                     mff = new FDGrounderInstantiate(this, this.linkedDomain.getPddlFilRef(), this.pddlFilRef);
                     break;
+                default:
+                    throw new IllegalArgumentException("Unsupported external grounding method: " + groundingMethod + ". Supported methods: metricff, fd, fdi, internal, naive");
             }
             groundingTime = System.currentTimeMillis();
             Collection<TransitionGround> transitions = mff.doGrounding();

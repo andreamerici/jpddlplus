@@ -41,12 +41,12 @@ public class PlannerUtils {
 
     private void setup(String domainFileName, String problemFileName, String heuristic) throws Exception {
         d = new PDDLDomain(domainFileName);
-        p = new PDDLProblem(problemFileName, d.constants, d.getTypes(), d, System.out, heuristic, true, false,new BigDecimal(1.0),new BigDecimal(1.0));
+        p = new PDDLProblem(problemFileName, d.constants, d.getTypes(), d, System.out, "internal", true, false,new BigDecimal(1.0),new BigDecimal(1.0));
         d.substituteEqualityConditions();
         if (!d.getProcessesSchema().isEmpty()) {
             p.setDeltaTimeVariable("1");
         }
-        p.prepareForSearch(true);
+        p.prepareForSearch(false);
         h = null;
 
         switch (heuristic) {
@@ -89,6 +89,20 @@ public class PlannerUtils {
         setup(domainFileName,problemFileName,heuristic);
         final float v = h.computeEstimate(p.getInit());
         return (int)v;
+    }
+
+    /**
+     * Carica il dominio e il problema, inizializza H1 e chiama il metodo
+     * computeInterferenceFree per verificare la proprietà del dominio
+     */
+    public boolean isInterferenceFree(String domainFileName, String problemFileName) throws Exception {
+        setup(domainFileName, problemFileName, "hadd");
+
+        if (h instanceof H1) {
+            return ((H1) h).computeInterferenceFree();
+        }
+
+        throw new UnsupportedOperationException("Il metodo isInterferenceFree richiede l'utilizzo di una classe di euristica H1");
     }
 
 }
