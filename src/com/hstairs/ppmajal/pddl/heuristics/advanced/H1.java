@@ -1267,7 +1267,8 @@ public class H1 implements SearchHeuristic {
         final IntArraySet[] directAchievers = getAllAchievers();
         final IntArraySet[] indirectAchievers = new IntArraySet[totNumberOfTerms];
 
-        for (int termId : getAllConditions()) {
+        final IntArraySet numericConds = getAllComparisons();
+        for (int termId : numericConds) {
             IntArraySet direct = directAchievers[termId];
             indirectAchievers[termId] = (direct == null) ? new IntArraySet() : new IntArraySet(direct);
         }
@@ -1277,7 +1278,7 @@ public class H1 implements SearchHeuristic {
         while (changes) {
             changes = false;
 
-            for (int termId : getAllConditions()) {
+            for (int termId : numericConds) {
                 final IntSet currentIAch = indirectAchievers[termId];
                 if (currentIAch == null || currentIAch.isEmpty()) continue;
 
@@ -1289,8 +1290,9 @@ public class H1 implements SearchHeuristic {
                     final IntSet precondTerminals = actionPreconditionTerminals[aPrimeId];
                     if (precondTerminals == null || precondTerminals.isEmpty()) continue;
 
-                    // per ogni terminale t in pre(a')
                     for (int preId : precondTerminals) {
+                        if (!numericConds.contains(preId)) continue; // considera solo precondizioni numeriche
+
                         final IntArraySet achieversOfTerminal = directAchievers[preId];
                         if (achieversOfTerminal == null) continue;
 
@@ -1324,7 +1326,7 @@ public class H1 implements SearchHeuristic {
     private Map<Entry<Integer, Integer>, Integer> precomputeCoAchievers(IntArraySet[] directAchievers) {
         Map<Entry<Integer, Integer>, Integer> coAchievers = new HashMap<>();
 
-        for (int psiId : getAllConditions()) {
+        for (int psiId : getAllComparisons()) {
             final IntArraySet achievers = directAchievers[psiId];
             if (achievers == null || achievers.size() < 2) continue;
 
@@ -1366,6 +1368,7 @@ public class H1 implements SearchHeuristic {
 
         if (ajPreconditions != null) {
             for (int precondId : ajPreconditions) {
+                if (!getAllComparisons().contains(precondId)) continue;
                 IntSet iAchSet = indirectAchievers[precondId];
                 if (iAchSet != null && iAchSet.contains(aiId)) {
                     aiIsIndirectAchiever = true;
