@@ -8,6 +8,19 @@ import static org.junit.Assert.*;
 
 public class H1InterferenceFreeTest {
 
+    // ------------------------ Helpers ------------------------
+    private void assertInterferenceFree(String dom, String prob, boolean expectedIF) throws Exception {
+        PlannerUtils pu = new PlannerUtils();
+        boolean isIF = pu.isInterferenceFree(dom, prob);
+        String msg = String.format("[IF-Check] %s | expected=%s, actual=%s", dom, expectedIF, isIF);
+        System.out.println(msg);
+        if (expectedIF) {
+            assertTrue("Expected domain to be Interference-Free: " + dom, isIF);
+        } else {
+            assertFalse("Expected domain to be Non-Interference-Free: " + dom, isIF);
+        }
+    }
+
     /**
      * Verifica il comportamento delle euristiche hadd e hmax su un dominio
      * specificamente progettato per essere Interference-Free.
@@ -253,64 +266,74 @@ public class H1InterferenceFreeTest {
         assertEquals("Su TrigonometricFunctions, attesa una dimensione ottimale del piano", 13, planSize);
     }
 
+    // ------------------------ Interference-Free checks (split per domain) ------------------------
     @Test
-    public void testComputeInterferenceFreeOnDomains() throws Exception {
-        PlannerUtils pu = new PlannerUtils();
+    public void testIF_h1_if() throws Exception {
+        assertInterferenceFree("unit_test_instances/h1_if/domain.pddl", "unit_test_instances/h1_if/problem.pddl", true);
+    }
 
-        // 1. Dominio progettato per essere IF
-        String dom_if = "unit_test_instances/h1_if/domain.pddl";
-        String prob_if = "unit_test_instances/h1_if/problem.pddl";
-        boolean isIF = pu.isInterferenceFree(dom_if, prob_if);
-        System.out.println("[IF-Check] Domain 'h1_if' is Interference-Free: " + isIF);
-        assertTrue("Expected 'h1_if' domain to be Interference-Free", isIF);
+    @Test
+    public void testNonIF_h1_non_if() throws Exception {
+        assertInterferenceFree("unit_test_instances/h1_non_if/domain.pddl", "unit_test_instances/h1_non_if/problem.pddl", false);
+    }
 
-        // 2. Dominio Non-IF
-        String dom_non_if = "unit_test_instances/h1_non_if/domain.pddl";
-        String prob_non_if = "unit_test_instances/h1_non_if/problem.pddl";
-        isIF = pu.isInterferenceFree(dom_non_if, prob_non_if);
-        System.out.println("[IF-Check] Domain 'h1_non_if' is Interference-Free: " + isIF);
-        assertFalse("Expected 'h1_non_if' domain to be Non-Interference-Free", isIF);
+    @Test
+    public void testNonIF_Processes() throws Exception {
+        assertInterferenceFree("unit_test_instances/car_linear_mt_sc/domain.pddl", "unit_test_instances/car_linear_mt_sc/sample.pddl", false);
+    }
 
-        // 3. Dominio Processes (Atteso: Non-IF)
-        String dom_proc = "unit_test_instances/car_linear_mt_sc/domain.pddl";
-        String prob_proc = "unit_test_instances/car_linear_mt_sc/sample.pddl";
-        isIF = pu.isInterferenceFree(dom_proc, prob_proc);
-        System.out.println("[IF-Check] Domain 'Processes' is Interference-Free: " + isIF);
-        assertFalse("Expected 'Processes' domain to be Non-Interference-Free", isIF);
+    @Test
+    public void testIF_Gripper_Propositional() throws Exception {
+        assertInterferenceFree("unit_test_instances/gripper/domain.pddl", "unit_test_instances/gripper/prob02.pddl", true);
+    }
 
-        // 4. Benchmark Gripper (Atteso: Non-IF)
-        String dom_grip = "unit_test_instances/gripper/domain.pddl";
-        String prob_grip = "unit_test_instances/gripper/prob02.pddl";
-        isIF = pu.isInterferenceFree(dom_grip, prob_grip);
-        System.out.println("[IF-Check] Domain 'Gripper' is Interference-Free: " + isIF);
-        assertFalse("Expected 'Gripper' domain to be Non-Interference-Free", isIF);
+    @Test
+    public void testIF_Blocks_Propositional() throws Exception {
+        assertInterferenceFree("unit_test_instances/blocks/domain.pddl", "unit_test_instances/blocks/task01.pddl", true);
+    }
 
-        // 5. Benchmark Blocks World (Atteso: Non-IF)
-        String dom_blocks = "unit_test_instances/blocks/domain.pddl";
-        String prob_blocks = "unit_test_instances/blocks/task01.pddl";
-        isIF = pu.isInterferenceFree(dom_blocks, prob_blocks);
-        System.out.println("[IF-Check] Domain 'Blocks' is Interference-Free: " + isIF);
-        assertFalse("Expected 'Blocks' domain to be Non-Interference-Free", isIF);
+    @Test
+    public void testIF_h1_if_prop() throws Exception {
+        assertInterferenceFree("unit_test_instances/h1_if_prop/domain.pddl", "unit_test_instances/h1_if_prop/problem.pddl", true);
+    }
 
-        // 6. Benchmark Prop (Atteso: IF)
-        String dom_prop = "unit_test_instances/h1_if_prop/domain.pddl";
-        String prob_prop = "unit_test_instances/h1_if_prop/problem.pddl";
-        isIF = pu.isInterferenceFree(dom_prop, prob_prop);
-        System.out.println("[IF-Check] Domain 'h1_if_prop' is Interference-Free: " + isIF);
-        assertTrue("Expected 'h1_if_prop' to be Interference-Free", isIF);
+    @Test
+    public void testIF_h1_non_if_prop_due_to_numeric_only() throws Exception {
+        assertInterferenceFree("unit_test_instances/h1_non_if_prop/domain.pddl", "unit_test_instances/h1_non_if_prop/problem.pddl", true);
+    }
 
-        // 7. Benchmark co-achievers su p dove p è anche precondizione (Atteso: Non-IF)
-        String dom_co = "unit_test_instances/h1_non_if_prop/domain.pddl";
-        String prob_co = "unit_test_instances/h1_non_if_prop/problem.pddl";
-        isIF = pu.isInterferenceFree(dom_co, prob_co);
-        System.out.println("[IF-Check] Domain 'h1_non_if_prop' is Interference-Free: " + isIF);
-        assertFalse("Expected 'h1_non_if_prop' to be Non-Interference-Free", isIF);
+    @Test
+    public void testNonIF_h1_numeric_non_if_decrease() throws Exception {
+        assertInterferenceFree("unit_test_instances/h1_numeric_non_if_decrease/domain.pddl", "unit_test_instances/h1_numeric_non_if_decrease/problem.pddl", false);
+    }
 
-        // 8. Benchmark numerico con azione che peggiora una precondizione numerica (Atteso: Non-IF)
-        String dom_peg = "unit_test_instances/h1_numeric_non_if_decrease/domain.pddl";
-        String prob_peg = "unit_test_instances/h1_numeric_non_if_decrease/problem.pddl";
-        isIF = pu.isInterferenceFree(dom_peg, prob_peg);
-        System.out.println("[IF-Check] Domain 'h1_numeric_non_if_decrease' is Interference-Free: " + isIF);
-        assertFalse("Expected 'h1_numeric_non_if_decrease' to be Non-Interference-Free", isIF);
+    @Test
+    public void testIF_h1_if_non_trivial() throws Exception {
+        assertInterferenceFree("unit_test_instances/h1_if_non_trivial/domain.pddl", "unit_test_instances/h1_if_non_trivial/problem.pddl", true);
+    }
+
+    @Test
+    public void testIF_prop_only_case2() throws Exception {
+        assertInterferenceFree("unit_test_instances/h1_if_prop_only2/domain.pddl", "unit_test_instances/h1_if_prop_only2/problem.pddl", true);
+    }
+
+    @Test
+    public void testIF_goal_numeric_coachievers_no_pre() throws Exception {
+        assertInterferenceFree("unit_test_instances/h1_if_goal_numeric_coachievers_no_pre/domain.pddl", "unit_test_instances/h1_if_goal_numeric_coachievers_no_pre/problem.pddl", true);
+    }
+
+    @Test
+    public void testNonIF_numeric_pre_mismatch() throws Exception {
+        assertInterferenceFree("unit_test_instances/h1_non_if_numeric_pre_mismatch/domain.pddl", "unit_test_instances/h1_non_if_numeric_pre_mismatch/problem.pddl", false);
+    }
+
+    @Test
+    public void testNonIF_numeric_decrease_strict2() throws Exception {
+        assertInterferenceFree("unit_test_instances/h1_non_if_numeric_decrease_strict2/domain.pddl", "unit_test_instances/h1_non_if_numeric_decrease_strict2/problem.pddl", false);
+    }
+
+    @Test
+    public void testIF_numeric_implication_holds() throws Exception {
+        assertInterferenceFree("unit_test_instances/h1_if_numeric_implication_holds/domain.pddl", "unit_test_instances/h1_if_numeric_implication_holds/problem.pddl", true);
     }
 }

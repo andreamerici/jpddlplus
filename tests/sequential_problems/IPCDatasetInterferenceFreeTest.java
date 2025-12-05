@@ -35,7 +35,7 @@ public class IPCDatasetInterferenceFreeTest {
                     .filter(Files::isDirectory)
                     .filter(dir -> {
                         String name = dir.getFileName().toString().toLowerCase();
-                        return name.equals("counters") ||
+                        return name.equals("farmland") ||
                                 name.equals("block-grouping") ||
                                 name.equals("drone") ||
                                 name.equals("expedition") ||
@@ -45,9 +45,10 @@ public class IPCDatasetInterferenceFreeTest {
                                 name.equals("fo-sailing") ||
                                 name.equals("hydropower") ||
                                 name.equals("martkettrader") ||
+                                name.equals("rover") ||
                                 name.equals("sailing") ||
                                 name.equals("sugar") ||
-                                name.equals("farmland") ;
+                                name.equals("counters") ;
                     })
                     .forEach(domainDir -> {
                 Path domainFile = domainDir.resolve("domain.pddl");
@@ -145,8 +146,6 @@ public class IPCDatasetInterferenceFreeTest {
         if (m.length() > 300) return m.substring(0, 300) + "...";
         return m;
     }
-
-    // -------------------- Helpers per tabella di riepilogo --------------------
 
     private static class ResultRow {
         final String domain;
