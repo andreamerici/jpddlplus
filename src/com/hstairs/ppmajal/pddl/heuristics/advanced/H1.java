@@ -16,7 +16,7 @@
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston,
  * MA 02110-1301  USA
  */
-/*
+ /*
  * To change this license header, choose License Headers in Project Properties.
  * To change this template file, choose Tools | Templates
  * and open the template in the editor.
@@ -139,16 +139,10 @@ public class H1 implements SearchHeuristic {
     // Achievers ed info per rilassato/smart constraints
     IntArraySet[] allAchievers;
     final private IntArraySet[] deleters;
-
-    // Insieme degli indirect achievers per ogni condizione terminale
+    protected int[] establishedAchiever;
     private IntArraySet[] indirectAchievers;
-
-    // Per relaxed plan: action scelta per raggiungere una condizione e num ripetizioni
-    protected int[] establishedAchiever;    // achiever registrato per ogni condizione
-    protected float[] numRepetition;        // numero ripetizioni per ogni condizione
-
-    // Helpful e raggiungibilità
-    private IntArraySet helpfulActions;
+    protected float[] numRepetition;
+    private List helpfulActions;
     IntArraySet reachableTransitions;
     private Collection<TransitionGround> reachableTransitionsInstances;
 
@@ -176,10 +170,12 @@ public class H1 implements SearchHeuristic {
     // Strutture per visita nel relaxed plan
     final boolean[] visited;
     protected final int[] maxNumRepetition ;
+    public boolean[] helpfulTransitionsMap = null;
     private boolean hardConditionthroughNumError;
     private Collection<TransitionGround> initActions;
     private final boolean storeInitActions;
 
+    private boolean isHelpfulMap = false;
 
     public H1(PDDLProblem problem) {
         this(problem, true, false, false, "no", false, false, false, false, null, false, -1);
@@ -585,9 +581,13 @@ public class H1 implements SearchHeuristic {
         stack.push(getActivatingConditions(goal));
         plan = new IntArraySet();
         Arrays.fill(visited, false);
-        helpfulActions = new IntArraySet();
+        helpfulActions = new ArrayList();
         Arrays.fill(maxNumRepetition, 0);
         Arrays.fill(repetitionsInThePlan, null);
+
+        if (isHelpfulMap){
+            helpfulTransitionsMap = new boolean[Transition.totNumberOfTransitions];
+        }
         while (!stack.isEmpty()) {
 
             final Pair<Collection, Float> elements;
@@ -602,7 +602,11 @@ public class H1 implements SearchHeuristic {
                             }
                             for (final int id : getAchievers(conditionId)) {
                                 if (getActionInit()[id]) {
-                                    helpfulActions.add(id);
+
+                                    helpfulActions.add((TransitionGround) getTransition(cp.cpTr2TrMap()[id]));
+                                    if (helpfulTransitionsMap != null){
+                                        helpfulTransitionsMap[cp.cpTr2TrMap()[id]] = true;
+                                    }
                                 }
                             }
                         }
@@ -813,6 +817,11 @@ public class H1 implements SearchHeuristic {
         }
     }
 
+    @Override
+    public boolean[] getHelpfulTransitionMap() {
+        return this.helpfulTransitionsMap;
+    }
+
     /**
      * Stima il costo per soddisfare una formula c, combinando i figli secondo
      * h_add (somma) o h_max (massimo), e applicando pruning se la stima supera "previous".
@@ -953,7 +962,7 @@ public class H1 implements SearchHeuristic {
      */
     @Override
     public Object[] getTransitions(final boolean helpful) {
-        Collection res = null;
+        Collection res;
         if (helpfulActions == null || !helpful) {
             if (reachableTransitionsInstances == null) {
                 if (reachableTransitions == null) {
@@ -972,15 +981,7 @@ public class H1 implements SearchHeuristic {
                 res = reachableTransitionsInstances;
             }
         } else {
-            final Collection actions = new ArrayList<>();
-            for (final int i : helpfulActions) {
-                final TransitionGround transition = (TransitionGround) getTransition(cp.cpTr2TrMap()[i]);
-                if (transition.getSemantics() == Transition.Semantics.ACTION) {
-                    actions.add(transition);
-                }
-            }
-            res = actions;
-
+            res = helpfulActions;
         }
         if (helpfulTransitions) {
             res.addAll(getHelpfulTransitions());
@@ -1007,7 +1008,9 @@ public class H1 implements SearchHeuristic {
             }
             reachableTransitionsInstances = new LinkedHashSet<TransitionGround>();
             for (final int i : reachableTransitions) {
-                reachableTransitionsInstances.add((TransitionGround) getTransition(cp.cpTr2TrMap()[i]));
+                TransitionGround transition = (TransitionGround) getTransition(cp.cpTr2TrMap()[i]);
+                if (transition.getSemantics().equals((Transition.Semantics.ACTION)))
+                    reachableTransitionsInstances.add((TransitionGround) getTransition(cp.cpTr2TrMap()[i]));
             }
             reachableTransitionsInstances = new ArrayList<>(reachableTransitionsInstances);
             return reachableTransitionsInstances;
@@ -1248,6 +1251,9 @@ public class H1 implements SearchHeuristic {
         return actionInit;
     }
 
+    public void setComputeHelpfulActionsMap(){
+        isHelpfulMap = true;
+    }
     // METODI PER INTERFERENCE FREE
     public boolean computeInterferenceFree() {
         // Assicura che gli achievers diretti siano calcolati per tutte le azioni,

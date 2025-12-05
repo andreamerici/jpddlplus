@@ -5,6 +5,7 @@ import com.hstairs.ppmajal.extraUtils.ExternalLoggerLogType;
 import com.hstairs.ppmajal.problem.State;
 import com.hstairs.ppmajal.search.searchnodes.SearchNode;
 import com.hstairs.ppmajal.search.searchnodes.SimpleSearchNode;
+import com.hstairs.ppmajal.transition.Transition;
 import com.hstairs.ppmajal.transition.TransitionGround;
 import it.unimi.dsi.fastutil.PriorityQueue;
 import it.unimi.dsi.fastutil.objects.Object2FloatMap;
@@ -12,7 +13,6 @@ import it.unimi.dsi.fastutil.objects.Object2FloatOpenHashMap;
 import it.unimi.dsi.fastutil.objects.ObjectHeapPriorityQueue;
 import org.apache.commons.lang3.tuple.ImmutablePair;
 import org.jgrapht.alg.util.Pair;
-
 import java.io.PrintStream;
 import java.util.*;
 
@@ -31,16 +31,18 @@ public class LazyWAStar extends WAStar {
         this(hw, optimality, helpfulActions, saveSearchSpace,tb, boundG,false, false);
     }
 
-    Object[] getActionsToSearch(List helpful, SearchHeuristic h, SearchProblem problem) {
+    Object[] getActionsToSearch(Object[] helpful, SearchHeuristic h, SearchProblem problem) {
 
         ArrayList res = new ArrayList();
         res.addAll(h.getAllTransitions());
-        if (problem instanceof PDDLProblem && ((PDDLProblem) problem).getProcessesSet().isEmpty())
+        if (problem instanceof PDDLProblem && !((PDDLProblem) problem).getProcessesSet().isEmpty())
             return res.toArray();
         if (helpful != null ){
             for (var v: helpful) {
                 if (!(v instanceof TransitionGround)) {
                     res.add(v);
+                }else{
+
                 }
             }
         }
@@ -75,6 +77,9 @@ public class LazyWAStar extends WAStar {
         if (this.helpfulActions) {
             init.helpfulActions = h.getTransitions(helpfulActions);
         }
+        if (helpfulActions){
+            h.setComputeHelpfulActionsMap();
+        }
         super.initHandle(init); //This is to inspect the search space if needed
         enqueue(frontier,init);
         this.tryLog(init, ExternalLoggerLogType.Generating);
@@ -102,14 +107,13 @@ public class LazyWAStar extends WAStar {
                 final long start = System.currentTimeMillis();
                 final float hExpanded = h.computeEstimate(currentNode.s);
                 if (hExpanded != Float.MAX_VALUE) {
-                    final List helpful = helpfulActions ? List.of(h.getTransitions(true)) : null;
+                    final Object[] helpful = helpfulActions ? h.getTransitions(true) : null;
 
                     heuristicTime += System.currentTimeMillis() - start;
                     bestf = printInfoDuringSearch(timeAtStart, out, bestf, fromTheBeginning,
                              nodesExpanded, nodesEvaluated, frontier, currentNode);
 
                     Object[] actionsToSearch = getActionsToSearch(helpful,h, problem);
-
                     for (final Iterator<Pair<State, Object>> it = problem.getSuccessors(currentNode.s,actionsToSearch); it.hasNext(); ) {
 
                         final Pair<State, Object> next = it.next();
@@ -127,18 +131,16 @@ public class LazyWAStar extends WAStar {
                                     boolean helpT = false;
                                     if (act instanceof ImmutablePair tr) {
                                         t = tr.getLeft();
+                                        if ((Integer)tr.getRight() <= 1){
+                                            continue;
+                                        }
                                         helpT = true;
                                     } else {
                                         t = act;
                                     }
                                     //if (!helpfulActions || helpfulActionsWithPruning || helpful.contains(t)){
-                                    if (helpfulActions && helpful.contains(t) ) {
-                                        if (helpT) {
-                                            //hValue = h.computeEstimate(successorState);
-                                            hValue -= (successorG - currentNode.gValue);///(int)((ImmutablePair)act).getRight();
-                                        }else{
-                                            hValue -= (successorG - currentNode.gValue);
-                                        }
+                                    if (helpfulActions && (! (t instanceof Integer)) && h.getHelpfulTransitionMap()[((Transition)t).getId()]) {
+                                        hValue -= (successorG - currentNode.gValue);
                                         hValue = Math.max(0, hValue);
                                     }
                                     nodesEvaluated++;
