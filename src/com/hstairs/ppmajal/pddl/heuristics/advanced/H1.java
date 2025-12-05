@@ -1248,6 +1248,7 @@ public class H1 implements SearchHeuristic {
         return actionInit;
     }
 
+    // METODI PER INTERFERENCE FREE
     public boolean computeInterferenceFree() {
         // Assicura che gli achievers diretti siano calcolati per tutte le azioni,
         // altrimenti le strutture usate dal controllo IF restano vuote.
@@ -1256,19 +1257,6 @@ public class H1 implements SearchHeuristic {
         this.isDomainInterferenceFree = isProblemInterferenceFree();
         return isDomainInterferenceFree;
     }
-
-
-    /**
-     * Metodo per creare una chiave Entry<Integer, Integer> simmetrica.
-     * Questo assicura che (aiId, ajId) e (ajId, aiId) generino la stessa chiave
-     */
-    private Entry<Integer, Integer> getSymmetricKey(int a, int b) {
-        int key1 = Math.min(a, b);
-        int key2 = Math.max(a, b);
-        // SimpleImmutableEntry garantisce un hash code e un equals corretti per la mappa
-        return new AbstractMap.SimpleImmutableEntry<>(key1, key2);
-    }
-
 
     /**
      * Calcola gli Indirect Achievers (IAch) per tutte le condizioni numeriche (Comparison).
@@ -1495,16 +1483,6 @@ public class H1 implements SearchHeuristic {
     }
 
     /**
-     * Popola gli achievers per tutte le azioni visitando gli effetti delle azioni.
-     */
-    private void ensureAchieversComputed() {
-        if (allActions == null || allActions.isEmpty()) return;
-        for (int aId : allActions) {
-            getConditionsAchievableById(aId);
-        }
-    }
-
-    /**
      * Verifica se la precondizione di a_i implica logicamente la precondizione di a_j.
      */
     private boolean checkPreconditionImplication(int aiId, int ajId) {
@@ -1527,12 +1505,63 @@ public class H1 implements SearchHeuristic {
         return pre_ai_terminals.containsAll(pre_aj_terminals);
     }
 
+    // METODI HELPER
+    /**
+     * Popola gli achievers per tutte le azioni visitando gli effetti delle azioni.
+     */
+    private void ensureAchieversComputed() {
+        if (allActions == null || allActions.isEmpty()) return;
+        for (int aId : allActions) {
+            getConditionsAchievableById(aId);
+        }
+    }
+
+    /**
+     * Verifica se l'azione a_i ha un effetto potenzialmente interferente su almeno una
+     * precondizione di a_j. Per evitare falsi positivi:
+     * - non considera gli effetti proposizionali
+     * - Consideriamo solo precondizioni numeriche in cui il contributo di a_i peggiora (v < 0)
+     *   la soddisfacibilità del confronto richiesto da a_j
+     */
+    private boolean affectsAnyPrecondition(int aiId, int ajId) {
+        final IntSet pre_aj_terminals = actionPreconditionTerminals[ajId];
+        if (pre_aj_terminals == null || pre_aj_terminals.isEmpty()) return false;
+
+        // Solo parte numerica: se una precondizione numerica è peggiorata da a_i
+        // Se viene trovata anche una sola precondizione numerica di aj che viene peggiorata da un effetto diretto di ai,
+        // il metodo restituisce true, forzando la verifica sull'implicazione
+        for (int termId : pre_aj_terminals) {
+            if (allComparisons.contains(termId)) {
+                final Terminal t = Terminal.getTerminal(termId);
+                if (t instanceof Comparison cmp) {
+                    final float v = this.numericContribution(aiId, cmp);
+                    // Considera interferenza solo se peggiora la condizione richiesta
+                    if (!Float.isNaN(v) && v < 0f) return true;
+                }
+            }
+        }
+
+        return false;
+    }
+
     private boolean isGoalAction(int actionId) {
         final int lastActionId = allActions.size() - 1;
 
         return actionId == lastActionId;
     }
 
+    /**
+     * Metodo per creare una chiave Entry<Integer, Integer> simmetrica.
+     * Questo assicura che (aiId, ajId) e (ajId, aiId) generino la stessa chiave
+     */
+    private Entry<Integer, Integer> getSymmetricKey(int a, int b) {
+        int key1 = Math.min(a, b);
+        int key2 = Math.max(a, b);
+        // SimpleImmutableEntry garantisce un hash code e un equals corretti per la mappa
+        return new AbstractMap.SimpleImmutableEntry<>(key1, key2);
+    }
+
+    // METODI PER LOG
     private String formatAction(int aId) {
         try {
             if (aId == cp.goal()) return "GOAL";
@@ -1577,30 +1606,4 @@ public class H1 implements SearchHeuristic {
         return null;
     }
 
-
-    /**
-     * Verifica se l'azione a_i ha un effetto potenzialmente interferente su almeno una
-     * precondizione di a_j. Per evitare falsi positivi:
-     * - non considera gli effetti proposizionali
-     * - Consideriamo solo precondizioni numeriche in cui il contributo di a_i peggiora (v < 0)
-     *   la soddisfacibilità del confronto richiesto da a_j
-     */
-    private boolean affectsAnyPrecondition(int aiId, int ajId) {
-        final IntSet pre_aj_terminals = actionPreconditionTerminals[ajId];
-        if (pre_aj_terminals == null || pre_aj_terminals.isEmpty()) return false;
-
-        // Solo parte numerica: se una precondizione numerica è peggiorata da a_i
-        for (int termId : pre_aj_terminals) {
-            if (allComparisons.contains(termId)) {
-                final Terminal t = Terminal.getTerminal(termId);
-                if (t instanceof Comparison cmp) {
-                    final float v = this.numericContribution(aiId, cmp);
-                    // Considera interferenza solo se peggiora la condizione richiesta
-                    if (!Float.isNaN(v) && v < 0f) return true;
-                }
-            }
-        }
-
-        return false;
-    }
 }
