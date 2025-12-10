@@ -341,7 +341,7 @@ public class H1 implements SearchHeuristic {
      * e popola:
      * - freePreconditionActions se non ci sono terminali (azione attivabile gratis);
      * - conditionToAction per notificare quali azioni dipendono da quale condizione;
-     * - allConditions e allComparisons (solo per le Comparison normalizzate).
+     * - allConditions e allComparisons
      */
     void updatePreconditionFunction(int i) {
         // estrae tutte le condizioni terminali dalla precondizione.
@@ -357,7 +357,6 @@ public class H1 implements SearchHeuristic {
         // Itera su ogni terminale trovato
         for (final Condition c : terminalConditions) {
             if (c instanceof Terminal) {
-                // Se è un confronto numerico, usa l'id normalizzato ovunque per coerenza
                 if (c instanceof Comparison) {
                     final Comparison normalize = (Comparison) c.normalize();
                     final int nid = normalize.getId();
@@ -394,7 +393,7 @@ public class H1 implements SearchHeuristic {
      * - Propagazione iniziale delle condizioni vere nello stato di input.
      * Il metodo smallSetup(State gs) inizializza tutti i costi a Float.MAX_VALUE,
      * segna i literal veri nello stato iniziale impostando conditionCost[t]=0
-     * per i terminal veri e chiama updateActions(...) sulle condizioni vere
+     * per i terminal veri e chiama updateActions sulle condizioni vere
      * per inserire azioni inizialmente applicabili nella coda con costo 0.
      * Questo corrisponde all’inizializzazione di ω e di η.
      */
@@ -460,8 +459,7 @@ public class H1 implements SearchHeuristic {
     }
 
     /**
-     * Esegue la propagazione dei costi (Dijkstra/Uniform-Cost-like) sul grafo rilassato.
-     * Ritorna il costo del goal oppure, se richiesto, il costo del relaxed plan estratto.
+     * Esegue la propagazione dei costi sul grafo rilassato.
      */
     @Override
     public float computeEstimate(State gs) {
@@ -633,7 +631,7 @@ public class H1 implements SearchHeuristic {
             }
         }
 
-        // Costo del MRP (Minimum/Max Relaxed Plan) in funzione della politica maxMRP
+        // Costo del piano in funzione della politica maxMRP
         float ret = 0;
         for (final int action : plan) {
             // tutte le azioni compatte per una data transizione condividono il costo
@@ -774,8 +772,8 @@ public class H1 implements SearchHeuristic {
     }
 
     /**
-     * Restituisce le condizioni terminali "attivanti" per una formula (And/Or/Terminal)
-     * e il costo cumulato corrispondente secondo la politica additiva o di massimo.
+     * Restituisce le condizioni terminali "attivanti" per una formula
+     * e il costo cumulato corrispondente
      */
     protected Pair<Collection, Float> getActivatingConditions(final Condition c) {
         if (c instanceof AndCond) {
@@ -823,8 +821,7 @@ public class H1 implements SearchHeuristic {
     }
 
     /**
-     * Stima il costo per soddisfare una formula c, combinando i figli secondo
-     * h_add (somma) o h_max (massimo), e applicando pruning se la stima supera "previous".
+     * Stima il costo per soddisfare una formula c
      */
     protected float estimateCost(final Condition c, float previous) {
         return this.estimateCost(c, isAdditive(),previous);
@@ -873,7 +870,7 @@ public class H1 implements SearchHeuristic {
     }
 
     /**
-     * Caching del contributo numerico: salva in matrice o mappa in base alla modalità.
+     * Caching del contributo numerico
      */
     void setNumericContribution(int a, int b, float value) {
         if (hardcoreVersion) {
@@ -1020,7 +1017,7 @@ public class H1 implements SearchHeuristic {
     }
 
     /**
-     * Estrae le helpful transitions con molteplicità (min o max) dal piano rilassato.
+     * Estrae le helpful transitions  dal piano rilassato.
      */
     public Collection<Pair<TransitionGround, Integer>> getHelpfulTransitions() {
         if (!extractRelaxedPlan && !isHelpfulActionsComputation()) {
@@ -1029,7 +1026,7 @@ public class H1 implements SearchHeuristic {
         Collection<Pair<TransitionGround, Integer>> res = new ArrayList<>();
 
         for (final int actionTransitionId : plan) {
-            int actionId = cp.tr2CpTrMap()[actionTransitionId].iterator().next();//Assume relazione 1-1 euristica/ricerca
+            int actionId = cp.tr2CpTrMap()[actionTransitionId].iterator().next();
             if (getActionInit()[actionId]) {
                 final IntArraySet right = repetitionsInThePlan[actionTransitionId];
                 if (!right.isEmpty()) {
@@ -1061,7 +1058,7 @@ public class H1 implements SearchHeuristic {
     }
 
     /**
-     * Registra che un'azione può "cancellare/peggiorare" un Comparison (smart constraints).
+     * Registra che un'azione può "cancellare/peggiorare" un Comparison
      */
     public void addDeleter(int i, int actId) {
         if (deleters[i] == null) {
@@ -1075,21 +1072,21 @@ public class H1 implements SearchHeuristic {
     }
 
     /**
-     * Restituisce la formulazione del goal come Condition (precondizione della pseudo-azione di goal).
+     * Restituisce la formulazione del goal come condition
      */
     public Condition getGoalFormulation() {
         return cp.preconditionFunction()[cp.goal()];
     }
 
     /**
-     * Restituisce (con caching) l'insieme di condizioni terminali che possono essere
-     * rese vere/peggiorate dall'azione data (proposizionali ∪ numeriche).
+     * Restituisce l'insieme di condizioni terminali che possono essere
+     * rese vere/peggiorate dall'azione data (proposizionali e numeriche).
      */
     protected IntSet getConditionsAchievableById(int actionId) {
         if (getConditionsAchievableBy()[actionId] == null) {
             final IntArraySet achievableTerms = new IntArraySet();
             final IntArraySet deletableTerms = new IntArraySet();
-            // Condizioni numeriche che l'azione può migliorare (o sconosciute -> perseguibili)
+            // Condizioni numeriche che l'azione può migliorare
             for (final int t : getAllComparisons()) {
                 final float v = this.numericContribution(actionId, (Comparison) Terminal.getTerminal(t));
                 if (v > 0 || v == UNKNOWNEFFECT) {
@@ -1145,21 +1142,15 @@ public class H1 implements SearchHeuristic {
         return (float) (-1f * eval / v);
     }
 
-    /**
-     * Hook per memorizzare info locali sul costo (usato in classi derivate).
-     */
     protected void cacheValue(float rep, int actionId, Terminal t) {
 
     }
 
-    /**
-     * Hook per gestire aggiornamenti aggiuntivi (usato in classi derivate).
-     */
     protected boolean update(Terminal t, boolean update, int actionId) {
         return update;
     }
 
-    // -------------------------- Getters/utility -------------------------------
+    // UTILITY
 
     /**
      * @return allAchievers (allocato on-demand se nullo)
@@ -1254,6 +1245,7 @@ public class H1 implements SearchHeuristic {
     public void setComputeHelpfulActionsMap(){
         isHelpfulMap = true;
     }
+
     // METODI PER INTERFERENCE FREE
     public boolean computeInterferenceFree() {
         // Assicura che gli achievers diretti siano calcolati per tutte le azioni,
@@ -1266,7 +1258,6 @@ public class H1 implements SearchHeuristic {
 
     /**
      * Calcola gli Indirect Achievers (IAch) per tutte le condizioni numeriche (Comparison).
-     * Ottimizzato per evitare la creazione di snapshot completi ad ogni iterazione.
      */
     private IntArraySet[] calculateIndirectAchievers() {
         // 1. inizializzazione con gli Achievers diretti (Ach)
@@ -1326,8 +1317,8 @@ public class H1 implements SearchHeuristic {
 
     /**
      * Pre-calcola tutte le coppie di azioni (a_i, a_j) che sono Achievers diretti (Ach)
-     * per la stessa condizione numerica psi (Condizione 2 della Def. 5).
-     * Restituisce: Mappa da coppia di Azioni (simmetrica) all'ID della psi che le fa co-achieve.
+     * per la stessa condizione numerica psi
+     * Restituisce: Mappa da coppia di Azioni (simmetrica) all'ID della psi che fa co-achieve.
      */
     private Map<Entry<Integer, Integer>, Integer> precomputeCoAchievers(IntArraySet[] directAchievers) {
         Map<Entry<Integer, Integer>, Integer> coAchievers = new HashMap<>();
@@ -1360,12 +1351,11 @@ public class H1 implements SearchHeuristic {
 
 
     /**
-     * Verifica se l'azione a_i interferisce con a_j (numerica)
-     * Lookup veloce per la Condizione 2.
+     * Verifica se l'azione a_i interferisce con a_j
      */
-    private int findInterferingCondition(int aiId, int ajId,
-                                         IntArraySet[] indirectAchievers,
-                                         Map<Entry<Integer, Integer>, Integer> coAchieversMap) {
+    private int findInterferingNumericCondition(int aiId, int ajId,
+                                                IntArraySet[] indirectAchievers,
+                                                Map<Entry<Integer, Integer>, Integer> coAchieversMap) {
         if (aiId == ajId) return -1;
 
         // 1. a_i in IAch(psi') per qualche psi' in pre(a_j)
@@ -1398,6 +1388,42 @@ public class H1 implements SearchHeuristic {
         return (psiId != null) ? psiId : -1;
     }
 
+    /**
+     * Estrae l'IntSet degli ID delle variabili numeriche modificate dall'azione specificata.
+     */
+    private IntSet getModifiedVarIds(int actionId) {
+        final Collection<NumEffect> effects = cp.numericEffectFunction()[actionId];
+        final IntSet modifiedIds = new IntArraySet();
+
+        if (effects != null) {
+            for (NumEffect effect : effects) {
+                if (effect != null && effect.getFluentAffected() != null) {
+                    modifiedIds.add(effect.getFluentAffected().getId());
+                }
+            }
+        }
+        return modifiedIds;
+    }
+
+    /**
+     * Verifica se a_i e a_j modificano la stessa variabile numerica
+     */
+    private boolean hasDirectNumericConflict(int aiId, int ajId) {
+        final IntSet modifiedFluents_ai = getModifiedVarIds(aiId);
+        final IntSet modifiedFluents_aj = getModifiedVarIds(ajId);
+
+        if (modifiedFluents_ai.isEmpty() || modifiedFluents_aj.isEmpty()) {
+            return false;
+        }
+
+        // Controlla l'intersezione
+        for (int fluentId : modifiedFluents_ai) {
+            if (modifiedFluents_aj.contains(fluentId)) {
+                return true;
+            }
+        }
+        return false;
+    }
 
     /**
      * Valuta se il problema è interference-free
@@ -1428,22 +1454,29 @@ public class H1 implements SearchHeuristic {
                     continue;
                 }
 
-                // 1. controlla se a_i interferisce con a_j (Def. 5)
-                int interferingPsiId = findInterferingCondition(aiId, ajId, indirectAchievers, coAchieversMap);
+                // 1. controlla se a_i interferisce con a_j
+                int interferingPsiId = findInterferingNumericCondition(aiId, ajId, indirectAchievers, coAchieversMap);
 
-                // se a_i interferisce con a_j
-                if (interferingPsiId != -1) {
+                // 2. controlla se c'è un conflitto numerico diretto
+                boolean directNumericConflict = hasDirectNumericConflict(aiId, ajId);
 
-                    // verifico la condizione di Interference-Free: pre(a_i) implica pre(a_j) (Def. 6)
+                // se a_i interferisce con a_j o c'è un conflitto diretto
+                if (interferingPsiId != -1 || directNumericConflict) {
+
+                    // verifico la condizione di Interference-Free: pre(a_i) implica pre(a_j)
                     if (!checkPreconditionImplication(aiId, ajId)) {
-                        System.out.println("VIOLAZIONE IF RILEVATA (Def.5 + Def.6):");
+                        System.out.println("VIOLAZIONE IF RILEVATA (Def.5 + Def.6 o Conflitto Diretto):");
                         System.out.println("  Coppia azioni: (" + formatAction(aiId) + ", " + formatAction(ajId) + ") [" + aiId + ", " + ajId + "]");
-                        System.out.println("  Psi co-achieved: " + formatTerminal(interferingPsiId) + " [id=" + interferingPsiId + "]");
-                        // prova a trovare almeno una precondizione di aj per cui ai ∈ IAch(pre(aj))
-                        String preWithIAch = findOneIndirectPrecondition(aiId, ajId);
-                        if (preWithIAch != null) {
-                            System.out.println("  Ai è in IAch di una precondizione di aj: " + preWithIAch);
+                        if (interferingPsiId != -1) {
+                            System.out.println("  Psi co-achieved: " + formatTerminal(interferingPsiId) + " [id=" + interferingPsiId + "]");
+                            String preWithIAch = findOneIndirectPrecondition(aiId, ajId);
+                            if (preWithIAch != null) {
+                                System.out.println("  Ai è in IAch di una precondizione di aj: " + preWithIAch);
+                            }
+                        } else {
+                            System.out.println("  Rilevato conflitto diretto su risorsa numerica (Num. Fluents intersection non vuota).");
                         }
+
                         // dettaglio precondizioni
                         System.out.println("  pre(ai): " + formatPreconditions(aiId));
                         System.out.println("  pre(aj): " + formatPreconditions(ajId));
@@ -1560,8 +1593,7 @@ public class H1 implements SearchHeuristic {
     }
 
     /**
-     * Metodo per creare una chiave Entry<Integer, Integer> simmetrica.
-     * Questo assicura che (aiId, ajId) e (ajId, aiId) generino la stessa chiave
+     * Mi assicuro che (aiId, ajId) e (ajId, aiId) generino la stessa chiave
      */
     private Entry<Integer, Integer> getSymmetricKey(int a, int b) {
         int key1 = Math.min(a, b);
