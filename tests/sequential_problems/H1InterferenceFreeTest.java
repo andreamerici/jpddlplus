@@ -8,7 +8,6 @@ import static org.junit.Assert.*;
 
 public class H1InterferenceFreeTest {
 
-    // ------------------------ Helpers ------------------------
     private void assertInterferenceFree(String dom, String prob, boolean expectedIF) throws Exception {
         PlannerUtils pu = new PlannerUtils();
         boolean isIF = pu.isInterferenceFree(dom, prob);
@@ -22,10 +21,7 @@ public class H1InterferenceFreeTest {
     }
 
     /**
-     * Verifica il comportamento delle euristiche hadd e hmax su un dominio
-     * specificamente progettato per essere Interference-Free.
-     * In un dominio IF, teoricamente hadd dovrebbe eguagliare hmax.
-     * Vengono anche verificate le stime e la dimensione del piano ottimale.
+     * Verifica il comportamento delle euristiche hadd e hmax su domini IF
      */
     @Test
     public void testH1OnIFDomain() throws Exception {
@@ -46,10 +42,7 @@ public class H1InterferenceFreeTest {
     }
 
     /**
-     * Verifica il comportamento delle euristiche hadd e hmax su un dominio
-     * che non è Interference-Free
-     * In questi domini, si verifica la relazione standard hadd >= hmax.
-     * Vengono anche verificate le stime e la dimensione del piano ottimale.
+     * Verifica il comportamento delle euristiche hadd e hmax su domini non IF
      */
     @Test
     public void testH1OnNonIFDomain() throws Exception {
@@ -69,11 +62,6 @@ public class H1InterferenceFreeTest {
         assertEquals("On non-IF example, expected optimal plan size = 3", 3, planSize);
     }
 
-    /**
-     * Test di regressione su car_linear_mt_sc)
-     * Verifica la relazione hadd >= hmax e la correttezza del calcolo hrmax.
-     * Controlla la dimensione del piano ottimale.
-     */
     @Test
     public void testH1OnProcessesDomain() throws Exception {
         PlannerUtils pu = new PlannerUtils();
@@ -94,10 +82,6 @@ public class H1InterferenceFreeTest {
         assertEquals("On Processes example, expected optimal plan size = 27", 27, planSize);
     }
 
-    /**
-     * Test di regressione sul benchmark classico Gripper.
-     * Verifica la relazione hadd >= hmax e la dimensione del piano ottimale.
-     */
     @Test
     public void testH1OnGripper() throws Exception {
         PlannerUtils pu = new PlannerUtils();
@@ -116,10 +100,6 @@ public class H1InterferenceFreeTest {
         assertEquals("On Gripper example, expected optimal plan size = 19", 19, planSize);
     }
 
-    /**
-     * Test di regressione sul benchmark classico Blocks World.
-     * Verifica la relazione hadd >= hmax e la dimensione del piano ottimale.
-     */
     @Test
     public void testH1OnBlocks() throws Exception {
         PlannerUtils pu = new PlannerUtils();
@@ -138,10 +118,6 @@ public class H1InterferenceFreeTest {
         assertEquals("On Blocks example, expected optimal plan size = 6", 6, planSize);
     }
 
-    /**
-     * Test di regressione su un dominio che fa uso di quantificazione e condizioni.
-     * Verifica la relazione hadd >= hmax e la dimensione del piano ottimale.
-     */
     @Test
     public void testH1OnQuantificationConditional() throws Exception {
         PlannerUtils pu = new PlannerUtils();
@@ -160,10 +136,6 @@ public class H1InterferenceFreeTest {
         assertEquals("On Quantification/Conditional example, expected optimal plan size = 1", 1, planSize);
     }
 
-    /**
-     * Test di regressione su una grande istanza del benchmark Depots.
-     * Verifica la relazione hadd >= hmax e la dimensione del piano ottimale.
-     */
     @Test
     @Ignore
     public void testH1OnDepotsBig() throws Exception {
@@ -183,10 +155,6 @@ public class H1InterferenceFreeTest {
         assertEquals("Su DepotsBig, attesa una dimensione ottimale del piano", 26, planSize);
     }
 
-    /**
-     * Test di regressione sul benchmark ZenoTravel per le euristiche.
-     * Verifica la relazione hadd >= hmax e la dimensione del piano ottimale.
-     */
     @Test
     public void testH1OnZenoTravelHeuristics() throws Exception {
         PlannerUtils pu = new PlannerUtils();
@@ -205,10 +173,6 @@ public class H1InterferenceFreeTest {
         assertEquals("Su ZenoTravel, attesa una dimensione ottimale del piano", 9, planSize);
     }
 
-    /**
-     * Test di regressione su un'istanza del benchmark Settlers.
-     * Verifica la relazione hadd >= hmax.
-     */
     @Test
     @Ignore
     public void testH1OnSettlers() throws Exception {
@@ -224,11 +188,6 @@ public class H1InterferenceFreeTest {
         assertTrue("Su Settlers, atteso hadd >= hmax", hadd >= hmax);
     }
 
-    /**
-     * Test di regressione su un dominio con espressioni numeriche complesse.
-     * Verifica la correttezza del calcolo delle euristiche hadd e hmax (incluso hadd >= hmax)
-     * in presenza di funzionalità PDDL avanzate.
-     */
     @Test
     public void testH1OnComplexExpressions() throws Exception {
         PlannerUtils pu = new PlannerUtils();
@@ -243,11 +202,6 @@ public class H1InterferenceFreeTest {
         assertTrue("In generale, su stessa istanza, vale hadd >= hmax", hadd >= hmax);
     }
 
-    /**
-     * Test di regressione su un dominio che include funzioni trigonometriche.
-     * Verifica la correttezza del calcolo delle euristiche hadd e hmax (incluso hadd >= hmax)
-     * e la dimensione del piano ottimale.
-     */
     @Test
     public void testH1OnTrigonometricFunctions() throws Exception {
         PlannerUtils pu = new PlannerUtils();
@@ -266,7 +220,6 @@ public class H1InterferenceFreeTest {
         assertEquals("Su TrigonometricFunctions, attesa una dimensione ottimale del piano", 13, planSize);
     }
 
-    // ------------------------ Interference-Free checks (split per domain) ------------------------
     @Test
     public void testIF_h1_if() throws Exception {
         assertInterferenceFree("unit_test_instances/h1_if/domain.pddl", "unit_test_instances/h1_if/problem.pddl", true);
@@ -298,13 +251,13 @@ public class H1InterferenceFreeTest {
     }
 
     @Test
-    public void testIF_h1_non_if_prop_due_to_numeric_only() throws Exception {
+    public void testIF_h1_non_if_prop() throws Exception {
         assertInterferenceFree("unit_test_instances/h1_non_if_prop/domain.pddl", "unit_test_instances/h1_non_if_prop/problem.pddl", true);
     }
 
     @Test
-    public void testNonIF_h1_numeric_non_if_decrease() throws Exception {
-        assertInterferenceFree("unit_test_instances/h1_numeric_non_if_decrease/domain.pddl", "unit_test_instances/h1_numeric_non_if_decrease/problem.pddl", false);
+    public void testNonIF_h1_numeric3() throws Exception {
+        assertInterferenceFree("unit_test_instances/h1_numeric_non_if3/domain.pddl", "unit_test_instances/h1_numeric_non_if3/problem.pddl", false);
     }
 
     @Test
@@ -313,27 +266,27 @@ public class H1InterferenceFreeTest {
     }
 
     @Test
-    public void testIF_prop_only_case2() throws Exception {
-        assertInterferenceFree("unit_test_instances/h1_if_prop_only2/domain.pddl", "unit_test_instances/h1_if_prop_only2/problem.pddl", true);
+    public void testIF_prop2() throws Exception {
+        assertInterferenceFree("unit_test_instances/h1_if_prop2/domain.pddl", "unit_test_instances/h1_if_prop2/problem.pddl", true);
     }
 
     @Test
-    public void testIF_goal_numeric_coachievers_no_pre() throws Exception {
-        assertInterferenceFree("unit_test_instances/h1_if_goal_numeric_coachievers_no_pre/domain.pddl", "unit_test_instances/h1_if_goal_numeric_coachievers_no_pre/problem.pddl", true);
+    public void testIF_goal_numeric_coachievers() throws Exception {
+        assertInterferenceFree("unit_test_instances/h1_if_coachievers/domain.pddl", "unit_test_instances/h1_if_coachievers/problem.pddl", true);
     }
 
     @Test
-    public void testNonIF_numeric_pre_mismatch() throws Exception {
-        assertInterferenceFree("unit_test_instances/h1_non_if_numeric_pre_mismatch/domain.pddl", "unit_test_instances/h1_non_if_numeric_pre_mismatch/problem.pddl", false);
+    public void testNonIF_numeric2() throws Exception {
+        assertInterferenceFree("unit_test_instances/h1_non_if_numeric2/domain.pddl", "unit_test_instances/h1_non_if_numeric2/problem.pddl", false);
     }
 
     @Test
-    public void testNonIF_numeric_decrease_strict2() throws Exception {
-        assertInterferenceFree("unit_test_instances/h1_non_if_numeric_decrease_strict2/domain.pddl", "unit_test_instances/h1_non_if_numeric_decrease_strict2/problem.pddl", false);
+    public void testNonIF_numeric() throws Exception {
+        assertInterferenceFree("unit_test_instances/h1_non_if_numeric/domain.pddl", "unit_test_instances/h1_non_if_numeric/problem.pddl", false);
     }
 
     @Test
-    public void testIF_numeric_implication_holds() throws Exception {
-        assertInterferenceFree("unit_test_instances/h1_if_numeric_implication_holds/domain.pddl", "unit_test_instances/h1_if_numeric_implication_holds/problem.pddl", true);
+    public void testIF_numeric_pre() throws Exception {
+        assertInterferenceFree("unit_test_instances/h1_if_numeric_pre/domain.pddl", "unit_test_instances/h1_if_numeric_pre/problem.pddl", true);
     }
 }

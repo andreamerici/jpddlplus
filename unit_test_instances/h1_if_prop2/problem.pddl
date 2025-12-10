@@ -1,0 +1,6 @@
+(define (problem h1_if_prop2)
+  (:domain h1_if_prop2)
+  (:objects)
+  (:init)
+  (:goal (q))
+)

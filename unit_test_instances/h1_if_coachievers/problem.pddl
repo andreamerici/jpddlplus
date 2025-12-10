@@ -1,0 +1,6 @@
+(define (problem h1_if_coachievers)
+  (:domain h1_if_coachievers)
+  (:objects)
+  (:init (= (x) 0))
+  (:goal (>= (x) 3))
+)
