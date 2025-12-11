@@ -21,49 +21,10 @@ public class H1InterferenceFreeTest {
     }
 
     /**
-     * Verifica il comportamento delle euristiche hadd e hmax su domini IF
+     * Test su domini vari
      */
     @Test
-    public void testH1OnIFDomain() throws Exception {
-        PlannerUtils pu = new PlannerUtils();
-        String dom = "unit_test_instances/h1_if/domain.pddl";
-        String prob = "unit_test_instances/h1_if/problem.pddl";
-
-        int hadd = pu.heuristicEstimate(dom, prob, "hadd");
-        int hmax = pu.heuristicEstimate(dom, prob, "hmax");
-        System.out.println("[H1][IF] hadd=" + hadd + ", hmax=" + hmax);
-        assertEquals("On IF example, expected hadd = 3", 3, hadd);
-        assertEquals("On IF example, expected hmax = 3", 3, hmax);
-        assertEquals("On interference-free example, hadd should match hmax", hadd, hmax);
-
-        int planSize = pu.getPlanSize(dom, prob, "hadd");
-        System.out.println("[H1][IF] planSize=" + planSize);
-        assertEquals("On IF example, expected optimal plan size = 3", 3, planSize);
-    }
-
-    /**
-     * Verifica il comportamento delle euristiche hadd e hmax su domini non IF
-     */
-    @Test
-    public void testH1OnNonIFDomain() throws Exception {
-        PlannerUtils pu = new PlannerUtils();
-        String dom = "unit_test_instances/h1_non_if/domain.pddl";
-        String prob = "unit_test_instances/h1_non_if/problem.pddl";
-
-        int hadd = pu.heuristicEstimate(dom, prob, "hadd");
-        int hmax = pu.heuristicEstimate(dom, prob, "hmax");
-        System.out.println("[H1][NonIF] hadd=" + hadd + ", hmax=" + hmax);
-        assertEquals("On non-IF example, expected hadd = 3", 3, hadd);
-        assertEquals("On non-IF example, expected hmax = 3", 3, hmax);
-        assertTrue("On non-interference-free example, hadd should be >= hmax", hadd >= hmax);
-
-        int planSize = pu.getPlanSize(dom, prob, "hadd");
-        System.out.println("[H1][NonIF] planSize=" + planSize);
-        assertEquals("On non-IF example, expected optimal plan size = 3", 3, planSize);
-    }
-
-    @Test
-    public void testH1OnProcessesDomain() throws Exception {
+    public void testH1SETUP1() throws Exception {
         PlannerUtils pu = new PlannerUtils();
         String dom = "unit_test_instances/car_linear_mt_sc/domain.pddl";
         String prob = "unit_test_instances/car_linear_mt_sc/sample.pddl";
@@ -83,7 +44,7 @@ public class H1InterferenceFreeTest {
     }
 
     @Test
-    public void testH1OnGripper() throws Exception {
+    public void testH1SETUP2() throws Exception {
         PlannerUtils pu = new PlannerUtils();
         String dom = "unit_test_instances/gripper/domain.pddl";
         String prob = "unit_test_instances/gripper/prob02.pddl";
@@ -101,7 +62,7 @@ public class H1InterferenceFreeTest {
     }
 
     @Test
-    public void testH1OnBlocks() throws Exception {
+    public void testH1SETUP3() throws Exception {
         PlannerUtils pu = new PlannerUtils();
         String dom = "unit_test_instances/blocks/domain.pddl";
         String prob = "unit_test_instances/blocks/task01.pddl";
@@ -119,7 +80,7 @@ public class H1InterferenceFreeTest {
     }
 
     @Test
-    public void testH1OnQuantificationConditional() throws Exception {
+    public void testH1SETUP4() throws Exception {
         PlannerUtils pu = new PlannerUtils();
         String dom = "unit_test_instances/quantification_conditional/domain.pddl";
         String prob = "unit_test_instances/quantification_conditional/problem.pddl";
@@ -138,7 +99,7 @@ public class H1InterferenceFreeTest {
 
     @Test
     @Ignore
-    public void testH1OnDepotsBig() throws Exception {
+    public void testH1SETUP5() throws Exception {
         PlannerUtils pu = new PlannerUtils();
         String dom = "unit_test_instances/depotsbig/domain.pddl";
         String prob = "unit_test_instances/depotsbig/sample.pddl";
@@ -156,7 +117,7 @@ public class H1InterferenceFreeTest {
     }
 
     @Test
-    public void testH1OnZenoTravelHeuristics() throws Exception {
+    public void testH1SETUP6() throws Exception {
         PlannerUtils pu = new PlannerUtils();
         String dom = "unit_test_instances/zenotravel/domain.pddl";
         String prob = "unit_test_instances/zenotravel/sample.pddl";
@@ -175,7 +136,7 @@ public class H1InterferenceFreeTest {
 
     @Test
     @Ignore
-    public void testH1OnSettlers() throws Exception {
+    public void testH1SETUP7() throws Exception {
         PlannerUtils pu = new PlannerUtils();
         String dom = "unit_test_instances/settlers/domain.pddl";
         String prob = "unit_test_instances/settlers/sample.pddl";
@@ -189,7 +150,7 @@ public class H1InterferenceFreeTest {
     }
 
     @Test
-    public void testH1OnComplexExpressions() throws Exception {
+    public void testH1SETUP8() throws Exception {
         PlannerUtils pu = new PlannerUtils();
         String dom = "unit_test_instances/complex_expressions/domain.pddl";
         String prob = "unit_test_instances/complex_expressions/sample.pddl";
@@ -203,7 +164,7 @@ public class H1InterferenceFreeTest {
     }
 
     @Test
-    public void testH1OnTrigonometricFunctions() throws Exception {
+    public void testH1SETUP9() throws Exception {
         PlannerUtils pu = new PlannerUtils();
         String dom = "unit_test_instances/trigonometric_functions/domain.pddl";
         String prob = "unit_test_instances/trigonometric_functions/sample.pddl";
@@ -220,73 +181,182 @@ public class H1InterferenceFreeTest {
         assertEquals("Su TrigonometricFunctions, attesa una dimensione ottimale del piano", 13, planSize);
     }
 
+    /**
+     * Test su domini custom
+     */
     @Test
-    public void testIF_h1_if() throws Exception {
-        assertInterferenceFree("unit_test_instances/h1_if/domain.pddl", "unit_test_instances/h1_if/problem.pddl", true);
+    public void testIF1() throws Exception {
+        assertInterferenceFree(
+                "unit_test_instances/h1_if/domain.pddl",
+                "unit_test_instances/h1_if/problem.pddl",
+                true);
     }
 
     @Test
-    public void testNonIF_h1_non_if() throws Exception {
-        assertInterferenceFree("unit_test_instances/h1_non_if/domain.pddl", "unit_test_instances/h1_non_if/problem.pddl", false);
+    public void testIF2() throws Exception {
+        assertInterferenceFree(
+                "unit_test_instances/h1_if2/domain.pddl",
+                "unit_test_instances/h1_if2/problem.pddl",
+                true);
     }
 
     @Test
-    public void testNonIF_Processes() throws Exception {
-        assertInterferenceFree("unit_test_instances/car_linear_mt_sc/domain.pddl", "unit_test_instances/car_linear_mt_sc/sample.pddl", false);
+    public void testIF3() throws Exception {
+        assertInterferenceFree(
+                "unit_test_instances/h1_if3/domain.pddl",
+                "unit_test_instances/h1_if3/problem.pddl",
+                true);
     }
 
     @Test
-    public void testIF_Gripper_Propositional() throws Exception {
-        assertInterferenceFree("unit_test_instances/gripper/domain.pddl", "unit_test_instances/gripper/prob02.pddl", true);
+    public void testIF4() throws Exception {
+        assertInterferenceFree(
+                "unit_test_instances/h1_if4/domain.pddl",
+                "unit_test_instances/h1_if4/problem.pddl",
+                true);
     }
 
     @Test
-    public void testIF_Blocks_Propositional() throws Exception {
-        assertInterferenceFree("unit_test_instances/blocks/domain.pddl", "unit_test_instances/blocks/task01.pddl", true);
+    public void testIF5() throws Exception {
+        assertInterferenceFree(
+                "unit_test_instances/h1_if5/domain.pddl",
+                "unit_test_instances/h1_if5/problem.pddl",
+                true);
     }
 
     @Test
-    public void testIF_h1_if_prop() throws Exception {
-        assertInterferenceFree("unit_test_instances/h1_if_prop/domain.pddl", "unit_test_instances/h1_if_prop/problem.pddl", true);
+    public void testIF6() throws Exception {
+        assertInterferenceFree(
+                "unit_test_instances/h1_if6/domain.pddl",
+                "unit_test_instances/h1_if6/problem.pddl",
+                true);
     }
 
     @Test
-    public void testIF_h1_non_if_prop() throws Exception {
-        assertInterferenceFree("unit_test_instances/h1_non_if_prop/domain.pddl", "unit_test_instances/h1_non_if_prop/problem.pddl", true);
+    public void testIF7() throws Exception {
+        assertInterferenceFree(
+                "unit_test_instances/h1_if7/domain.pddl",
+                "unit_test_instances/h1_if7/problem.pddl",
+                true);
     }
 
     @Test
-    public void testNonIF_h1_numeric3() throws Exception {
-        assertInterferenceFree("unit_test_instances/h1_numeric_non_if3/domain.pddl", "unit_test_instances/h1_numeric_non_if3/problem.pddl", false);
+    public void testIF8() throws Exception {
+        assertInterferenceFree(
+                "unit_test_instances/h1_if8/domain.pddl",
+                "unit_test_instances/h1_if8/problem.pddl",
+                true);
     }
 
     @Test
-    public void testIF_h1_if_non_trivial() throws Exception {
-        assertInterferenceFree("unit_test_instances/h1_if_non_trivial/domain.pddl", "unit_test_instances/h1_if_non_trivial/problem.pddl", true);
+    public void testIF9() throws Exception {
+        assertInterferenceFree(
+                "unit_test_instances/h1_if9/domain.pddl",
+                "unit_test_instances/h1_if9/problem.pddl",
+                true);
     }
 
     @Test
-    public void testIF_prop2() throws Exception {
-        assertInterferenceFree("unit_test_instances/h1_if_prop2/domain.pddl", "unit_test_instances/h1_if_prop2/problem.pddl", true);
+    public void testIF10() throws Exception {
+        assertInterferenceFree(
+                "unit_test_instances/h1_if10/domain.pddl",
+                "unit_test_instances/h1_if10/problem.pddl",
+                true);
     }
 
     @Test
-    public void testIF_goal_numeric_coachievers() throws Exception {
-        assertInterferenceFree("unit_test_instances/h1_if_coachievers/domain.pddl", "unit_test_instances/h1_if_coachievers/problem.pddl", true);
+    public void testIF11() throws Exception {
+        assertInterferenceFree(
+                "unit_test_instances/h1_if11/domain.pddl",
+                "unit_test_instances/h1_if11/problem.pddl",
+                true);
     }
 
     @Test
-    public void testNonIF_numeric2() throws Exception {
-        assertInterferenceFree("unit_test_instances/h1_non_if_numeric2/domain.pddl", "unit_test_instances/h1_non_if_numeric2/problem.pddl", false);
+    public void testIF12() throws Exception {
+        assertInterferenceFree(
+                "unit_test_instances/h1_if12/domain.pddl",
+                "unit_test_instances/h1_if12/problem.pddl",
+                true);
     }
 
     @Test
-    public void testNonIF_numeric() throws Exception {
-        assertInterferenceFree("unit_test_instances/h1_non_if_numeric/domain.pddl", "unit_test_instances/h1_non_if_numeric/problem.pddl", false);
+    public void testIF13() throws Exception {
+        assertInterferenceFree(
+                "unit_test_instances/h1_if13/domain.pddl",
+                "unit_test_instances/h1_if13/problem.pddl",
+                true);
     }
 
     @Test
-    public void testIF_numeric_pre() throws Exception {
-        assertInterferenceFree("unit_test_instances/h1_if_numeric_pre/domain.pddl", "unit_test_instances/h1_if_numeric_pre/problem.pddl", true);
+    public void testIF14() throws Exception {
+        assertInterferenceFree(
+                "unit_test_instances/h1_if14/domain.pddl",
+                "unit_test_instances/h1_if14/problem.pddl",
+                true);
+    }
+
+    @Test
+    public void testNONIF1() throws Exception {
+        assertInterferenceFree(
+                "unit_test_instances/h1_non_if/domain.pddl",
+                "unit_test_instances/h1_non_if/problem.pddl",
+                false);
+    }
+
+    @Test
+    public void testNONIF2() throws Exception {
+        assertInterferenceFree(
+                "unit_test_instances/h1_non_if2/domain.pddl",
+                "unit_test_instances/h1_non_if2/problem.pddl",
+                false);
+    }
+
+    @Test
+    public void testNONIF3() throws Exception {
+        assertInterferenceFree(
+                "unit_test_instances/h1_non_if3/domain.pddl",
+                "unit_test_instances/h1_non_if3/problem.pddl",
+                false);
+    }
+
+    @Test
+    public void testNONIF4() throws Exception {
+        assertInterferenceFree(
+                "unit_test_instances/h1_non_if4/domain.pddl",
+                "unit_test_instances/h1_non_if4/problem.pddl",
+                false);
+    }
+
+    @Test
+    public void testNONIF5() throws Exception {
+        assertInterferenceFree(
+                "unit_test_instances/h1_non_if5/domain.pddl",
+                "unit_test_instances/h1_non_if5/problem.pddl",
+                false);
+    }
+
+    @Test
+    public void testNONIF6() throws Exception {
+        assertInterferenceFree(
+                "unit_test_instances/h1_non_if6/domain.pddl",
+                "unit_test_instances/h1_non_if6/problem.pddl",
+                false);
+    }
+
+    @Test
+    public void testNONIF7() throws Exception {
+        assertInterferenceFree(
+                "unit_test_instances/h1_non_if7/domain.pddl",
+                "unit_test_instances/h1_non_if7/problem.pddl",
+                false);
+    }
+
+    @Test
+    public void testNONIF8() throws Exception {
+        assertInterferenceFree(
+                "unit_test_instances/h1_non_if8/domain.pddl",
+                "unit_test_instances/h1_non_if8/problem.pddl",
+                false);
     }
 }

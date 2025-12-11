@@ -1,0 +1,6 @@
+(define (problem h1_non_if)
+  (:domain h1_non_if)
+  (:objects)
+  (:init (= (y) 4))
+  (:goal (>= (y) 5))
+)

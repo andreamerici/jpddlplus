@@ -1,6 +1,0 @@
-(define (problem h1_non_if_numeric2)
-  (:domain h1_non_if_numeric2)
-  (:objects)
-  (:init (= (x) 0))
-  (:goal (>= (x) 6))
-)
