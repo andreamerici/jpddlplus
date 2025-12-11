@@ -187,176 +187,176 @@ public class H1InterferenceFreeTest {
     @Test
     public void testIF1() throws Exception {
         assertInterferenceFree(
-                "unit_test_instances/h1_if/domain.pddl",
-                "unit_test_instances/h1_if/problem.pddl",
+                "unit_test_instances/if/h1_if/domain.pddl",
+                "unit_test_instances/if/h1_if/problem.pddl",
                 true);
     }
 
     @Test
     public void testIF2() throws Exception {
         assertInterferenceFree(
-                "unit_test_instances/h1_if2/domain.pddl",
-                "unit_test_instances/h1_if2/problem.pddl",
+                "unit_test_instances/if/h1_if2/domain.pddl",
+                "unit_test_instances/if/h1_if2/problem.pddl",
                 true);
     }
 
     @Test
     public void testIF3() throws Exception {
         assertInterferenceFree(
-                "unit_test_instances/h1_if3/domain.pddl",
-                "unit_test_instances/h1_if3/problem.pddl",
+                "unit_test_instances/if/h1_if3/domain.pddl",
+                "unit_test_instances/if/h1_if3/problem.pddl",
                 true);
     }
 
     @Test
     public void testIF4() throws Exception {
         assertInterferenceFree(
-                "unit_test_instances/h1_if4/domain.pddl",
-                "unit_test_instances/h1_if4/problem.pddl",
+                "unit_test_instances/if/h1_if4/domain.pddl",
+                "unit_test_instances/if/h1_if4/problem.pddl",
                 true);
     }
 
     @Test
     public void testIF5() throws Exception {
         assertInterferenceFree(
-                "unit_test_instances/h1_if5/domain.pddl",
-                "unit_test_instances/h1_if5/problem.pddl",
+                "unit_test_instances/if/h1_if5/domain.pddl",
+                "unit_test_instances/if/h1_if5/problem.pddl",
                 true);
     }
 
     @Test
     public void testIF6() throws Exception {
         assertInterferenceFree(
-                "unit_test_instances/h1_if6/domain.pddl",
-                "unit_test_instances/h1_if6/problem.pddl",
+                "unit_test_instances/if/h1_if6/domain.pddl",
+                "unit_test_instances/if/h1_if6/problem.pddl",
                 true);
     }
 
     @Test
     public void testIF7() throws Exception {
         assertInterferenceFree(
-                "unit_test_instances/h1_if7/domain.pddl",
-                "unit_test_instances/h1_if7/problem.pddl",
+                "unit_test_instances/if/h1_if7/domain.pddl",
+                "unit_test_instances/if/h1_if7/problem.pddl",
                 true);
     }
 
     @Test
     public void testIF8() throws Exception {
         assertInterferenceFree(
-                "unit_test_instances/h1_if8/domain.pddl",
-                "unit_test_instances/h1_if8/problem.pddl",
+                "unit_test_instances/if/h1_if8/domain.pddl",
+                "unit_test_instances/if/h1_if8/problem.pddl",
                 true);
     }
 
     @Test
     public void testIF9() throws Exception {
         assertInterferenceFree(
-                "unit_test_instances/h1_if9/domain.pddl",
-                "unit_test_instances/h1_if9/problem.pddl",
+                "unit_test_instances/if/h1_if9/domain.pddl",
+                "unit_test_instances/if/h1_if9/problem.pddl",
                 true);
     }
 
     @Test
     public void testIF10() throws Exception {
         assertInterferenceFree(
-                "unit_test_instances/h1_if10/domain.pddl",
-                "unit_test_instances/h1_if10/problem.pddl",
+                "unit_test_instances/if/h1_if10/domain.pddl",
+                "unit_test_instances/if/h1_if10/problem.pddl",
                 true);
     }
 
     @Test
     public void testIF11() throws Exception {
         assertInterferenceFree(
-                "unit_test_instances/h1_if11/domain.pddl",
-                "unit_test_instances/h1_if11/problem.pddl",
+                "unit_test_instances/if/h1_if11/domain.pddl",
+                "unit_test_instances/if/h1_if11/problem.pddl",
                 true);
     }
 
     @Test
     public void testIF12() throws Exception {
         assertInterferenceFree(
-                "unit_test_instances/h1_if12/domain.pddl",
-                "unit_test_instances/h1_if12/problem.pddl",
+                "unit_test_instances/if/h1_if12/domain.pddl",
+                "unit_test_instances/if/h1_if12/problem.pddl",
                 true);
     }
 
     @Test
     public void testIF13() throws Exception {
         assertInterferenceFree(
-                "unit_test_instances/h1_if13/domain.pddl",
-                "unit_test_instances/h1_if13/problem.pddl",
+                "unit_test_instances/if/h1_if13/domain.pddl",
+                "unit_test_instances/if/h1_if13/problem.pddl",
                 true);
     }
 
     @Test
     public void testIF14() throws Exception {
         assertInterferenceFree(
-                "unit_test_instances/h1_if14/domain.pddl",
-                "unit_test_instances/h1_if14/problem.pddl",
+                "unit_test_instances/if/h1_if14/domain.pddl",
+                "unit_test_instances/if/h1_if14/problem.pddl",
                 true);
     }
 
     @Test
     public void testNONIF1() throws Exception {
         assertInterferenceFree(
-                "unit_test_instances/h1_non_if/domain.pddl",
-                "unit_test_instances/h1_non_if/problem.pddl",
+                "unit_test_instances/if/h1_non_if/domain.pddl",
+                "unit_test_instances/if/h1_non_if/problem.pddl",
                 false);
     }
 
     @Test
     public void testNONIF2() throws Exception {
         assertInterferenceFree(
-                "unit_test_instances/h1_non_if2/domain.pddl",
-                "unit_test_instances/h1_non_if2/problem.pddl",
+                "unit_test_instances/if/h1_non_if2/domain.pddl",
+                "unit_test_instances/if/h1_non_if2/problem.pddl",
                 false);
     }
 
     @Test
     public void testNONIF3() throws Exception {
         assertInterferenceFree(
-                "unit_test_instances/h1_non_if3/domain.pddl",
-                "unit_test_instances/h1_non_if3/problem.pddl",
+                "unit_test_instances/if/h1_non_if3/domain.pddl",
+                "unit_test_instances/if/h1_non_if3/problem.pddl",
                 false);
     }
 
     @Test
     public void testNONIF4() throws Exception {
         assertInterferenceFree(
-                "unit_test_instances/h1_non_if4/domain.pddl",
-                "unit_test_instances/h1_non_if4/problem.pddl",
+                "unit_test_instances/if/h1_non_if4/domain.pddl",
+                "unit_test_instances/if/h1_non_if4/problem.pddl",
                 false);
     }
 
     @Test
     public void testNONIF5() throws Exception {
         assertInterferenceFree(
-                "unit_test_instances/h1_non_if5/domain.pddl",
-                "unit_test_instances/h1_non_if5/problem.pddl",
+                "unit_test_instances/if/h1_non_if5/domain.pddl",
+                "unit_test_instances/if/h1_non_if5/problem.pddl",
                 false);
     }
 
     @Test
     public void testNONIF6() throws Exception {
         assertInterferenceFree(
-                "unit_test_instances/h1_non_if6/domain.pddl",
-                "unit_test_instances/h1_non_if6/problem.pddl",
+                "unit_test_instances/if/h1_non_if6/domain.pddl",
+                "unit_test_instances/if/h1_non_if6/problem.pddl",
                 false);
     }
 
     @Test
     public void testNONIF7() throws Exception {
         assertInterferenceFree(
-                "unit_test_instances/h1_non_if7/domain.pddl",
-                "unit_test_instances/h1_non_if7/problem.pddl",
+                "unit_test_instances/if/h1_non_if7/domain.pddl",
+                "unit_test_instances/if/h1_non_if7/problem.pddl",
                 false);
     }
 
     @Test
     public void testNONIF8() throws Exception {
         assertInterferenceFree(
-                "unit_test_instances/h1_non_if8/domain.pddl",
-                "unit_test_instances/h1_non_if8/problem.pddl",
+                "unit_test_instances/if/h1_non_if8/domain.pddl",
+                "unit_test_instances/if/h1_non_if8/problem.pddl",
                 false);
     }
 }
