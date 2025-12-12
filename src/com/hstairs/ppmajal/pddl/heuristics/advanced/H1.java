@@ -1318,7 +1318,7 @@ public class H1 implements SearchHeuristic {
     /**
      * Pre-calcola tutte le coppie di azioni (a_i, a_j) che sono Achievers diretti (Ach)
      * per la stessa condizione numerica psi
-     * Restituisce: Mappa da coppia di Azioni (simmetrica) all'ID della psi che fa co-achieve.
+     * Restituisco: Mappa da coppia di Azioni all'ID della psi che fa co-achieve
      */
     private Map<Entry<Integer, Integer>, Integer> precomputeCoAchievers(IntArraySet[] directAchievers) {
         Map<Entry<Integer, Integer>, Integer> coAchievers = new HashMap<>();
@@ -1389,43 +1389,6 @@ public class H1 implements SearchHeuristic {
     }
 
     /**
-     * Estrae l'IntSet degli ID delle variabili numeriche modificate dall'azione specificata.
-     */
-    private IntSet getModifiedVarIds(int actionId) {
-        final Collection<NumEffect> effects = cp.numericEffectFunction()[actionId];
-        final IntSet modifiedIds = new IntArraySet();
-
-        if (effects != null) {
-            for (NumEffect effect : effects) {
-                if (effect != null && effect.getFluentAffected() != null) {
-                    modifiedIds.add(effect.getFluentAffected().getId());
-                }
-            }
-        }
-        return modifiedIds;
-    }
-
-    /**
-     * Verifica se a_i e a_j modificano la stessa variabile numerica
-     */
-    private boolean hasDirectNumericConflict(int aiId, int ajId) {
-        final IntSet modifiedFluents_ai = getModifiedVarIds(aiId);
-        final IntSet modifiedFluents_aj = getModifiedVarIds(ajId);
-
-        if (modifiedFluents_ai.isEmpty() || modifiedFluents_aj.isEmpty()) {
-            return false;
-        }
-
-        // Controlla l'intersezione
-        for (int fluentId : modifiedFluents_ai) {
-            if (modifiedFluents_aj.contains(fluentId)) {
-                return true;
-            }
-        }
-        return false;
-    }
-
-    /**
      * Valuta se il problema è interference-free
      */
     private boolean isProblemInterferenceFree() {
@@ -1454,43 +1417,35 @@ public class H1 implements SearchHeuristic {
                     continue;
                 }
 
-                // 1. controlla se a_i interferisce con a_j
+                // controlla se a_i interferisce con a_j
                 int interferingPsiId = findInterferingNumericCondition(aiId, ajId, indirectAchievers, coAchieversMap);
 
-                // 2. controlla se c'è un conflitto numerico diretto
-                boolean directNumericConflict = hasDirectNumericConflict(aiId, ajId);
-
-                // se a_i interferisce con a_j o c'è un conflitto diretto
-                if (interferingPsiId != -1 || directNumericConflict) {
+                // se a_i interferisce con a_j
+                if (interferingPsiId != -1) {
 
                     // verifico la condizione di Interference-Free: pre(a_i) implica pre(a_j)
                     if (!checkPreconditionImplication(aiId, ajId)) {
-                        System.out.println("VIOLAZIONE IF RILEVATA (Def.5 + Def.6 o Conflitto Diretto):");
+                        System.out.println("VIOLAZIONE IF RILEVATA (implicazione non verificata):");
                         System.out.println("  Coppia azioni: (" + formatAction(aiId) + ", " + formatAction(ajId) + ") [" + aiId + ", " + ajId + "]");
-                        if (interferingPsiId != -1) {
-                            System.out.println("  Psi co-achieved: " + formatTerminal(interferingPsiId) + " [id=" + interferingPsiId + "]");
-                            String preWithIAch = findOneIndirectPrecondition(aiId, ajId);
-                            if (preWithIAch != null) {
-                                System.out.println("  Ai è in IAch di una precondizione di aj: " + preWithIAch);
-                            }
-                        } else {
-                            System.out.println("  Rilevato conflitto diretto su risorsa numerica (Num. Fluents intersection non vuota).");
+                        System.out.println("  Psi co-achieved: " + formatTerminal(interferingPsiId) + " [id=" + interferingPsiId + "]");
+                        String preWithIAch = findOneIndirectPrecondition(aiId, ajId);
+                        if (preWithIAch != null) {
+                            System.out.println("  Ai è in IAch di una precondizione di aj: " + preWithIAch);
                         }
 
                         // dettaglio precondizioni
                         System.out.println("  pre(ai): " + formatPreconditions(aiId));
                         System.out.println("  pre(aj): " + formatPreconditions(ajId));
-                        System.out.println("  Violazione (Def. 6): pre(ai) NON implica pre(aj)");
                         return false;
                     }
                 }
 
                 // 2. se a_i influenza direttamente una precondizione
-                //    (proposizionale o numerica) di a_j, allora occorre comunque che
+                //    di a_j, allora occorre comunque che
                 //    pre(a_i) => pre(a_j)
                 if (affectsAnyPrecondition(aiId, ajId)) {
                     if (!checkPreconditionImplication(aiId, ajId)) {
-                        System.out.println("VIOLAZIONE IF RILEVATA (Effetto diretto su precondizione):");
+                        System.out.println("VIOLAZIONE IF RILEVATA (ai peggiora una precond di aj e non la implica):");
                         System.out.println("  Coppia azioni: (" + formatAction(aiId) + ", " + formatAction(ajId) + ") [" + aiId + ", " + ajId + "]");
                         System.out.println("  Precondizioni numeriche di aj peggiorate da ai:");
                         System.out.println("  pre(ai): " + formatPreconditions(aiId));
@@ -1500,7 +1455,7 @@ public class H1 implements SearchHeuristic {
                 }
 
                 // 3. se ai e aj co-achievano una psi e almeno uno dei due richiede psi come precondizione,
-                //    l'implicazione fra precondizioni deve essere vera (altrimenti dominio non-IF).
+                //    l'implicazione fra precondizioni deve essere vera
                 Entry<Integer, Integer> pair = getSymmetricKey(aiId, ajId);
                 Integer psiId = coAchieversMap.get(pair);
                 if (psiId != null) {
@@ -1509,9 +1464,9 @@ public class H1 implements SearchHeuristic {
                     boolean psiRequired = (pre_ai != null && pre_ai.contains(psiId)) || (pre_aj != null && pre_aj.contains(psiId));
                     if (psiRequired) {
                         if (!checkPreconditionImplication(aiId, ajId)) {
-                            System.out.println("VIOLAZIONE IF RILEVATA (Co-achievers su ψ che è anche precondizione):");
+                            System.out.println("VIOLAZIONE IF RILEVATA (Co-achievers su psi che è anche precondizione):");
                             System.out.println("  Coppia azioni: (" + formatAction(aiId) + ", " + formatAction(ajId) + ") [" + aiId + ", " + ajId + "]");
-                            System.out.println("  ψ: " + formatTerminal(psiId) + " [id=" + psiId + "] è richiesta come precondizione da almeno una delle due azioni");
+                            System.out.println("  psi: " + formatTerminal(psiId) + " [id=" + psiId + "] è richiesta come precondizione da almeno una delle due azioni");
                             System.out.println("  pre(ai): " + formatPreconditions(aiId));
                             System.out.println("  pre(aj): " + formatPreconditions(ajId));
                             return false;
@@ -1560,10 +1515,7 @@ public class H1 implements SearchHeuristic {
 
     /**
      * Verifica se l'azione a_i ha un effetto potenzialmente interferente su almeno una
-     * precondizione di a_j. Per evitare falsi positivi:
-     * - non considera gli effetti proposizionali
-     * - Consideriamo solo precondizioni numeriche in cui il contributo di a_i peggiora (v < 0)
-     *   la soddisfacibilità del confronto richiesto da a_j
+     * precondizione di a_j
      */
     private boolean affectsAnyPrecondition(int aiId, int ajId) {
         final IntSet pre_aj_terminals = actionPreconditionTerminals[ajId];
@@ -1571,7 +1523,7 @@ public class H1 implements SearchHeuristic {
 
         // Solo parte numerica: se una precondizione numerica è peggiorata da a_i
         // Se viene trovata anche una sola precondizione numerica di aj che viene peggiorata da un effetto diretto di ai,
-        // il metodo restituisce true, forzando la verifica sull'implicazione
+        // il metodo restituisce true
         for (int termId : pre_aj_terminals) {
             if (allComparisons.contains(termId)) {
                 final Terminal t = Terminal.getTerminal(termId);
