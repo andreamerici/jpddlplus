@@ -1,6 +1,7 @@
 (define (problem h1_if5)
   (:domain h1_if5)
   (:objects)
+
   (:init (= (x) 0))
   (:goal (>= (x) 3))
 )

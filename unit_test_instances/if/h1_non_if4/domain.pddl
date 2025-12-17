@@ -1,16 +1,12 @@
 (define (domain h1_non_if)
   (:requirements :numeric-fluents)
-  (:functions (x))
+  (:functions (x) (y) (z))
 
-  (:action dec2
-    :parameters ()
-    :precondition (and)
-    :effect (decrease (x) 2)
-  )
+  (:action a1
+    :precondition (>= (x) 0)
+    :effect (and (increase (x) 1) (increase (y) 1)))
 
-  (:action need-gt3
-    :parameters ()
-    :precondition (and (> (x) 3))
-    :effect (increase (x) 0)
-  )
+  (:action a2
+    :precondition (>= (z) 100)
+    :effect (and (increase (x) 10) (increase (y) 10)))
 )

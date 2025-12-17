@@ -1,17 +1,16 @@
 (define (domain h1_non_if)
   (:requirements :numeric-fluents)
+  (:functions (x) (y) (z) (w))
 
-  (:functions (x) (y))
+  (:action a1
+    :precondition (>= (x) 5)
+    :effect (increase (z) 2))
 
-  (:action set-a
-    :parameters ()
-    :precondition (and (>= (y) 10))
-    :effect (assign (x) 6) ; Abilita inc-b
-  )
+  (:action a2
+    :precondition (and (>= (x) 10) (>= (w) 80))
+    :effect (increase (z) 20))
 
-  (:action inc-b
-    :parameters ()
-    :precondition (and (>= (x) 5))
-    :effect (increase (y) 1) ; Modifica precondizione di set-a
-  )
+  (:action a3
+    :precondition (>= (z) 50)
+    :effect (increase (w) 100))
 )

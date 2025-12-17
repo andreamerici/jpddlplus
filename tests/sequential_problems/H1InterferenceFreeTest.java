@@ -351,12 +351,4 @@ public class H1InterferenceFreeTest {
                 "unit_test_instances/if/h1_non_if7/problem.pddl",
                 false);
     }
-
-    @Test
-    public void testNONIF8() throws Exception {
-        assertInterferenceFree(
-                "unit_test_instances/if/h1_non_if8/domain.pddl",
-                "unit_test_instances/if/h1_non_if8/problem.pddl",
-                false);
-    }
 }

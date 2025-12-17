@@ -1,17 +1,20 @@
 (define (domain h1_non_if)
-  (:requirements :numeric-fluents)
+  (:requirements :numeric-fluents :typing)
+  (:types generatore batteria)
 
-  (:functions (x) (y))
+  (:functions
+    (accumulo ?b - batteria)
+    (gen ?g - generatore))
 
-  (:action dec-x
-    :parameters ()
-    :precondition (and)
-    :effect (decrease (x) 1)
+  (:action carica_standard
+    :parameters (?g - generatore ?b - batteria)
+    :precondition (>= (accumulo ?b) 0)
+    :effect (increase (accumulo ?b) 10)
   )
 
-  (:action need-x-ge-1
-    :parameters ()
-    :precondition (and (>= (x) 1))
-    :effect (increase (y) 1)
+  (:action carica_acc
+    :parameters (?g - generatore ?b - batteria)
+    :precondition (>= (gen ?g) 50)
+    :effect (increase (accumulo ?b) 25)
   )
 )

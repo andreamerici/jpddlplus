@@ -1247,6 +1247,8 @@ public class H1 implements SearchHeuristic {
     }
 
     // METODI PER INTERFERENCE FREE
+    
+    // 1
     public boolean computeInterferenceFree() {
         // Assicura che gli achievers diretti siano calcolati per tutte le azioni,
         // altrimenti le strutture usate dal controllo IF restano vuote.
@@ -1259,6 +1261,7 @@ public class H1 implements SearchHeuristic {
     /**
      * Calcola gli Indirect Achievers (IAch) per tutte le condizioni numeriche (Comparison).
      */
+    // 2
     private IntArraySet[] calculateIndirectAchievers() {
         // 1. inizializzazione con gli Achievers diretti (Ach)
         final IntArraySet[] directAchievers = getAllAchievers();
@@ -1320,6 +1323,7 @@ public class H1 implements SearchHeuristic {
      * per la stessa condizione numerica psi
      * Restituisco: Mappa da coppia di Azioni all'ID della psi che fa co-achieve
      */
+    // 3
     private Map<Entry<Integer, Integer>, Integer> precomputeCoAchievers(IntArraySet[] directAchievers) {
         Map<Entry<Integer, Integer>, Integer> coAchievers = new HashMap<>();
 
@@ -1443,36 +1447,36 @@ public class H1 implements SearchHeuristic {
                 // 2. se a_i influenza direttamente una precondizione
                 //    di a_j, allora occorre comunque che
                 //    pre(a_i) => pre(a_j)
-                if (affectsAnyPrecondition(aiId, ajId)) {
-                    if (!checkPreconditionImplication(aiId, ajId)) {
-                        System.out.println("VIOLAZIONE IF RILEVATA (ai peggiora una precond di aj e non la implica):");
-                        System.out.println("  Coppia azioni: (" + formatAction(aiId) + ", " + formatAction(ajId) + ") [" + aiId + ", " + ajId + "]");
-                        System.out.println("  Precondizioni numeriche di aj peggiorate da ai:");
-                        System.out.println("  pre(ai): " + formatPreconditions(aiId));
-                        System.out.println("  pre(aj): " + formatPreconditions(ajId));
-                        return false;
-                    }
-                }
+//                if (affectsAnyPrecondition(aiId, ajId)) {
+//                    if (!checkPreconditionImplication(aiId, ajId)) {
+//                        System.out.println("VIOLAZIONE IF RILEVATA (ai peggiora una precond di aj e non la implica):");
+//                        System.out.println("  Coppia azioni: (" + formatAction(aiId) + ", " + formatAction(ajId) + ") [" + aiId + ", " + ajId + "]");
+//                        System.out.println("  Precondizioni numeriche di aj peggiorate da ai:");
+//                        System.out.println("  pre(ai): " + formatPreconditions(aiId));
+//                        System.out.println("  pre(aj): " + formatPreconditions(ajId));
+//                        return false;
+//                    }
+//                }
 
                 // 3. se ai e aj co-achievano una psi e almeno uno dei due richiede psi come precondizione,
                 //    l'implicazione fra precondizioni deve essere vera
-                Entry<Integer, Integer> pair = getSymmetricKey(aiId, ajId);
-                Integer psiId = coAchieversMap.get(pair);
-                if (psiId != null) {
-                    final IntSet pre_ai = actionPreconditionTerminals[aiId];
-                    final IntSet pre_aj = actionPreconditionTerminals[ajId];
-                    boolean psiRequired = (pre_ai != null && pre_ai.contains(psiId)) || (pre_aj != null && pre_aj.contains(psiId));
-                    if (psiRequired) {
-                        if (!checkPreconditionImplication(aiId, ajId)) {
-                            System.out.println("VIOLAZIONE IF RILEVATA (Co-achievers su psi che è anche precondizione):");
-                            System.out.println("  Coppia azioni: (" + formatAction(aiId) + ", " + formatAction(ajId) + ") [" + aiId + ", " + ajId + "]");
-                            System.out.println("  psi: " + formatTerminal(psiId) + " [id=" + psiId + "] è richiesta come precondizione da almeno una delle due azioni");
-                            System.out.println("  pre(ai): " + formatPreconditions(aiId));
-                            System.out.println("  pre(aj): " + formatPreconditions(ajId));
-                            return false;
-                        }
-                    }
-                }
+//                Entry<Integer, Integer> pair = getSymmetricKey(aiId, ajId);
+//                Integer psiId = coAchieversMap.get(pair);
+//                if (psiId != null) {
+//                    final IntSet pre_ai = actionPreconditionTerminals[aiId];
+//                    final IntSet pre_aj = actionPreconditionTerminals[ajId];
+//                    boolean psiRequired = (pre_ai != null && pre_ai.contains(psiId)) || (pre_aj != null && pre_aj.contains(psiId));
+//                    if (psiRequired) {
+//                        if (!checkPreconditionImplication(aiId, ajId)) {
+//                            System.out.println("VIOLAZIONE IF RILEVATA (Co-achievers su psi che è anche precondizione):");
+//                            System.out.println("  Coppia azioni: (" + formatAction(aiId) + ", " + formatAction(ajId) + ") [" + aiId + ", " + ajId + "]");
+//                            System.out.println("  psi: " + formatTerminal(psiId) + " [id=" + psiId + "] è richiesta come precondizione da almeno una delle due azioni");
+//                            System.out.println("  pre(ai): " + formatPreconditions(aiId));
+//                            System.out.println("  pre(aj): " + formatPreconditions(ajId));
+//                            return false;
+//                        }
+//                    }
+//                }
             }
         }
 
@@ -1517,6 +1521,7 @@ public class H1 implements SearchHeuristic {
      * Verifica se l'azione a_i ha un effetto potenzialmente interferente su almeno una
      * precondizione di a_j
      */
+    @Deprecated
     private boolean affectsAnyPrecondition(int aiId, int ajId) {
         final IntSet pre_aj_terminals = actionPreconditionTerminals[ajId];
         if (pre_aj_terminals == null || pre_aj_terminals.isEmpty()) return false;

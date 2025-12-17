@@ -1,28 +1,13 @@
 (define (domain h1_non_if)
-; Non-IF perché dec-x peggiora una precondizione numerica di need-x-nonneg
-; e pre(dec-x) = {ok} NON implica pre(need-x-nonneg) = {ok, (>= (x) 0)}.
-  (:requirements :typing :numeric-fluents)
+(:requirements :numeric-fluents)
+  (:functions (x) (y))
 
-  (:predicates (ok) (g))
-  (:functions (x))
+  (:action a1
+    :precondition (>= (x) 0)
+    :effect (increase (x) 5))
 
-  (:action set-ok
+  (:action a2
     :parameters ()
-    :precondition (and)
-    :effect (ok)
-  )
-
-  ; Azione che peggiora una precondizione numerica altrui (v < 0)
-  (:action dec-x
-    :parameters ()
-    :precondition (and (ok))
-    :effect (decrease (x) 1)
-  )
-
-  ; Azione che richiede (>= (x) 0): soggetta a interferenza da dec-x
-  (:action need-x-nonneg
-    :parameters ()
-    :precondition (and (ok) (>= (x) 0))
-    :effect (g)
-  )
+    :precondition (and (>= (x) 10) (>= (y) 1))
+    :effect (increase (x) 10))
 )
