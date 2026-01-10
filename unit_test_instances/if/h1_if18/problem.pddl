@@ -1,0 +1,10 @@
+(define (problem h1_if18)
+  (:domain h1_if18)
+  (:init
+    (= (water-level) 0)
+    (= (energy-reserve) 5)
+    (pump-ready)
+    (manual-override)
+  )
+  (:goal (>= (water-level) 40))
+)

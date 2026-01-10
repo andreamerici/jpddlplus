@@ -1,0 +1,5 @@
+(define (problem h1_non_if17)
+  (:domain h1_non_if17)
+  (:init (= (xp) 0) (has-weapon) (in-dungeon))
+  (:goal (>= (xp) 1000))
+)

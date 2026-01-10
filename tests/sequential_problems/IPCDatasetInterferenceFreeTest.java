@@ -40,9 +40,6 @@ public class IPCDatasetInterferenceFreeTest {
                                 name.equals("drone") ||
                                 name.equals("expedition") ||
                                 name.equals("ext-plant-watering") ||
-                                name.equals("fo-counters") ||
-                                name.equals("fo-farmland") ||
-                                name.equals("fo-sailing") ||
                                 name.equals("hydropower") ||
                                 name.equals("martkettrader") ||
                                 name.equals("rover") ||

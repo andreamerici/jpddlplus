@@ -1,4 +1,4 @@
-(define (domain h1_if)
+(define (domain h1_non_if)
   (:requirements :numeric-fluents)
   (:functions (x))
 

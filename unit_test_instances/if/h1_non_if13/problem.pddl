@@ -1,0 +1,5 @@
+(define (problem h1_non_if13)
+  (:domain h1_non_if13)
+  (:init (= (energy-produced) 0) (dam-permit) (reactor-safe) (grid-connected))
+  (:goal (>= (energy-produced) 100))
+)

@@ -1,0 +1,5 @@
+(define (problem h1_non_if15)
+  (:domain h1_non_if15)
+  (:init (= (temperature) 0) (= (pressure) 0) (mixer-on) (safety-valve-open))
+  (:goal (>= (temperature) 100))
+)

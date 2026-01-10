@@ -1,0 +1,11 @@
+(define (problem h1_if17)
+  (:domain h1_if17)
+  (:init
+    (= (vtotal) 0)
+    (= (temp) 150)
+    (mode-auto)
+    (mode-manual)
+    (sensor-on)
+  )
+  (:goal (>= (vtotal) 20))
+)

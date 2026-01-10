@@ -1,0 +1,5 @@
+(define (problem h1_non_if14)
+  (:domain h1_non_if14)
+  (:init (= (disk-space) 0) (server-online) (backup-done) (can-compress))
+  (:goal (>= (disk-space) 1000))
+)

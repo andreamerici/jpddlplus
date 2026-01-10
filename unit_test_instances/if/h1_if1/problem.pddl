@@ -1,5 +1,5 @@
-(define (problem h1_if)
-  (:domain h1_if)
+(define (problem h1_if1)
+  (:domain h1_if1)
   (:objects)
 
   (:init

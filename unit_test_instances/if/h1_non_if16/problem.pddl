@@ -1,0 +1,5 @@
+(define (problem h1_non_if16)
+  (:domain h1_non_if16)
+  (:init (= (packages-delivered) 0) (truck-ready) (plane-ready) (weather-clear))
+  (:goal (>= (packages-delivered) 20))
+)

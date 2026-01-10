@@ -1,4 +1,4 @@
-(define (domain h1_non_if)
+(define (domain h1_non_if1)
   (:requirements :numeric-fluents :typing)
   (:types generatore batteria)
 

@@ -1,4 +1,4 @@
-(define (domain h1_if)
+(define (domain h1_if1)
   (:requirements :typing :numeric-fluents)
 
   (:predicates (p))

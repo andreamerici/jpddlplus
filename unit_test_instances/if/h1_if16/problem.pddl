@@ -1,0 +1,5 @@
+(define (problem h1_if16)
+  (:domain h1_if16)
+  (:init (= (fuel) 0) (= (level) 3))
+  (:goal (>= (fuel) 100))
+)

@@ -105,4 +105,15 @@ public class PlannerUtils {
         throw new UnsupportedOperationException("Il metodo isInterferenceFree richiede l'utilizzo di una classe di euristica H1");
     }
 
+    public int getInterferenceFreeConditionsCount(String domainFileName, String problemFileName) throws Exception {
+        setup(domainFileName, problemFileName, "hadd");
+
+        if (h instanceof H1) {
+            ((H1) h).computeInterferenceFree();
+            return ((H1) h).getInterferenceFreeConditionsCount();
+        }
+
+        throw new UnsupportedOperationException("Il metodo getInterferenceFreeConditionsCount richiede l'utilizzo di una classe di euristica H1");
+    }
+
 }
