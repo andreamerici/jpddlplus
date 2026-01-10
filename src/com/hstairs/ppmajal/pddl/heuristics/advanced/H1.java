@@ -79,7 +79,7 @@ public class H1 implements SearchHeuristic {
     final public boolean extractRelaxedPlan;
     final public boolean maxMRP;
 
-    boolean isDomainInterferenceFree;
+    private boolean[] isConditionInterferenceFree;
 
     // Problema compatto su cui si lavora
     public final CompactPDDLProblem cp;
@@ -694,7 +694,7 @@ public class H1 implements SearchHeuristic {
                         final float executionCost = rep * getActionCost()[actionId]; // Costo di esecuzione rep * gamma(a)
                         boolean localUpdate = false;
 
-                        if (isAdditive() || this.isDomainInterferenceFree) {
+                        if (isAdditive() || (this.isConditionInterferenceFree != null && this.isConditionInterferenceFree[conditionId])) {
                             // Se h_add O h_max Interference-Free:
                             // Costo = CostoPrerequisiti(a) + CostoEsecuzione(a) (minimo della somma)
                             // Il costo cumulato è la somma del costo dei prerequisiti e del costo di esecuzione (executionCost).
@@ -1254,8 +1254,7 @@ public class H1 implements SearchHeuristic {
         // altrimenti le strutture usate dal controllo IF restano vuote.
         ensureAchieversComputed();
         this.indirectAchievers = calculateIndirectAchievers();
-        this.isDomainInterferenceFree = isProblemInterferenceFree();
-        return isDomainInterferenceFree;
+        return isProblemInterferenceFree();
     }
 
     /**
@@ -1319,173 +1318,100 @@ public class H1 implements SearchHeuristic {
 
 
     /**
-     * Pre-calcola tutte le coppie di azioni (a_i, a_j) che sono Achievers diretti (Ach)
-     * per la stessa condizione numerica psi
-     * Restituisco: Mappa da coppia di Azioni all'ID della psi che fa co-achieve
-     */
-    // 3
-    private Map<Entry<Integer, Integer>, Integer> precomputeCoAchievers(IntArraySet[] directAchievers) {
-        Map<Entry<Integer, Integer>, Integer> coAchievers = new HashMap<>();
-
-        for (int psiId : getAllComparisons()) {
-            final IntArraySet achievers = directAchievers[psiId];
-            if (achievers == null || achievers.size() < 2) continue;
-
-            // converte in array per iterare in modo efficiente
-            int[] achArray = achievers.toIntArray();
-
-            // itera su tutte le coppie di achievers (a_i, a_j) per questa psi
-            for (int i = 0; i < achArray.length; i++) {
-                for (int j = i + 1; j < achArray.length; j++) {
-                    int aiId = achArray[i];
-                    int ajId = achArray[j];
-
-                    // usa il metodo helper per creare la chiave simmetrica
-                    Entry<Integer, Integer> pair = getSymmetricKey(aiId, ajId);
-
-                    // mappa la coppia al primo psi trovato
-                    if (!coAchievers.containsKey(pair)) {
-                        coAchievers.put(pair, psiId);
-                    }
-                }
-            }
-        }
-        return coAchievers;
-    }
-
-
-    /**
-     * Verifica se l'azione a_i interferisce con a_j
-     */
-    private int findInterferingNumericCondition(int aiId, int ajId,
-                                                IntArraySet[] indirectAchievers,
-                                                Map<Entry<Integer, Integer>, Integer> coAchieversMap) {
-        if (aiId == ajId) return -1;
-
-        // 1. a_i in IAch(psi') per qualche psi' in pre(a_j)
-        boolean aiIsIndirectAchiever = false;
-        final IntSet ajPreconditions = actionPreconditionTerminals[ajId];
-
-        if (ajPreconditions != null) {
-            for (int precondId : ajPreconditions) {
-                if (!getAllComparisons().contains(precondId)) continue;
-                IntSet iAchSet = indirectAchievers[precondId];
-                if (iAchSet != null && iAchSet.contains(aiId)) {
-                    aiIsIndirectAchiever = true;
-                    break;
-                }
-            }
-        }
-
-        if (!aiIsIndirectAchiever) {
-            return -1; // fallisce la Condizione 1
-        }
-
-        // 2. esiste psi tale che a_i in Ach(psi) E a_j in Ach(psi)
-
-        // crea la chiave simmetrica
-        Entry<Integer, Integer> pair = getSymmetricKey(aiId, ajId);
-
-        // cerca nella mappa pre-calcolata
-        Integer psiId = coAchieversMap.get(pair);
-
-        return (psiId != null) ? psiId : -1;
-    }
-
-    /**
-     * Valuta se il problema è interference-free
+     * Valuta se il problema è interference-free e popola isConditionInterferenceFree
      */
     private boolean isProblemInterferenceFree() {
         ensureAchieversComputed();
         // calcola le dipendenze una sola volta
         final IntArraySet[] directAchievers = getAllAchievers();
-        final IntArraySet[] indirectAchievers = calculateIndirectAchievers();
+        
+        if (this.indirectAchievers == null) {
+            this.indirectAchievers = calculateIndirectAchievers();
+        }
+        final IntArraySet[] indirectAchievers = this.indirectAchievers;
 
-        // pre-calcolo usando Map.Entry
-        final Map<Entry<Integer, Integer>, Integer> coAchieversMap = precomputeCoAchievers(directAchievers);
+        this.isConditionInterferenceFree = new boolean[totNumberOfTerms];
+        Arrays.fill(this.isConditionInterferenceFree, true);
 
-        // itera su tutte le coppie di azioni distinte (a_i, a_j)
-        for (int aiId : allActions) {
-            // Salta se a_i è l'azione Goal fittizia
-            if (isGoalAction(aiId)) {
+        boolean problemIF = true;
+        int ifCount = 0;
+        int totalComparisons = getAllComparisons().size();
+
+        // itera su tutte le condizioni numeriche psi
+        for (int psiId : getAllComparisons()) {
+            final IntArraySet achievers = directAchievers[psiId];
+            if (achievers == null || achievers.size() < 2) {
+                ifCount++;
                 continue;
             }
 
-            for (int ajId : allActions) {
-                // Salta se a_j è l'azione Goal fittizia
-                if (isGoalAction(ajId)) {
-                    continue;
-                }
+            int[] achArray = achievers.toIntArray();
 
-                if (aiId == ajId) {
-                    continue;
-                }
+            // itera su tutte le coppie di achievers (a_i, a_j) per questa psi
+            for (int i = 0; i < achArray.length; i++) {
+                int aiId = achArray[i];
+                if (isGoalAction(aiId)) continue;
+                for (int j = 0; j < achArray.length; j++) {
+                    if (i == j) continue;
+                    int ajId = achArray[j];
+                    if (isGoalAction(ajId)) continue;
 
-                // controlla se a_i interferisce con a_j
-                int interferingPsiId = findInterferingNumericCondition(aiId, ajId, indirectAchievers, coAchieversMap);
-
-                // se a_i interferisce con a_j
-                if (interferingPsiId != -1) {
-
-                    // verifico la condizione di Interference-Free: pre(a_i) implica pre(a_j)
-                    if (!checkPreconditionImplication(aiId, ajId)) {
-                        System.out.println("VIOLAZIONE IF RILEVATA (implicazione non verificata):");
-                        System.out.println("  Coppia azioni: (" + formatAction(aiId) + ", " + formatAction(ajId) + ") [" + aiId + ", " + ajId + "]");
-                        System.out.println("  Psi co-achieved: " + formatTerminal(interferingPsiId) + " [id=" + interferingPsiId + "]");
-                        String preWithIAch = findOneIndirectPrecondition(aiId, ajId);
-                        if (preWithIAch != null) {
-                            System.out.println("  Ai è in IAch di una precondizione di aj: " + preWithIAch);
+                    // Condizione 1: a_i in IAch(pre(a_j))
+                    boolean aiIsIndirectAchiever = false;
+                    final IntSet ajPreconditions = actionPreconditionTerminals[ajId];
+                    if (ajPreconditions != null) {
+                        for (int precondId : ajPreconditions) {
+                            if (!getAllComparisons().contains(precondId)) continue;
+                            IntSet iAchSet = indirectAchievers[precondId];
+                            if (iAchSet != null && iAchSet.contains(aiId)) {
+                                aiIsIndirectAchiever = true;
+                                break;
+                            }
                         }
+                    }
 
-                        // dettaglio precondizioni
-                        System.out.println("  pre(ai): " + formatPreconditions(aiId));
-                        System.out.println("  pre(aj): " + formatPreconditions(ajId));
-                        return false;
+                    if (aiIsIndirectAchiever) {
+                        this.isConditionInterferenceFree[psiId] = false;
+                        problemIF = false;
+                        System.out.println("[IF-Check] Violation for condition " + formatTerminal(psiId) + ": action " + formatAction(aiId) + " interferes with " + formatAction(ajId));
+                        break;
                     }
                 }
-
-                // 2. se a_i influenza direttamente una precondizione
-                //    di a_j, allora occorre comunque che
-                //    pre(a_i) => pre(a_j)
-//                if (affectsAnyPrecondition(aiId, ajId)) {
-//                    if (!checkPreconditionImplication(aiId, ajId)) {
-//                        System.out.println("VIOLAZIONE IF RILEVATA (ai peggiora una precond di aj e non la implica):");
-//                        System.out.println("  Coppia azioni: (" + formatAction(aiId) + ", " + formatAction(ajId) + ") [" + aiId + ", " + ajId + "]");
-//                        System.out.println("  Precondizioni numeriche di aj peggiorate da ai:");
-//                        System.out.println("  pre(ai): " + formatPreconditions(aiId));
-//                        System.out.println("  pre(aj): " + formatPreconditions(ajId));
-//                        return false;
-//                    }
-//                }
-
-                // 3. se ai e aj co-achievano una psi e almeno uno dei due richiede psi come precondizione,
-                //    l'implicazione fra precondizioni deve essere vera
-//                Entry<Integer, Integer> pair = getSymmetricKey(aiId, ajId);
-//                Integer psiId = coAchieversMap.get(pair);
-//                if (psiId != null) {
-//                    final IntSet pre_ai = actionPreconditionTerminals[aiId];
-//                    final IntSet pre_aj = actionPreconditionTerminals[ajId];
-//                    boolean psiRequired = (pre_ai != null && pre_ai.contains(psiId)) || (pre_aj != null && pre_aj.contains(psiId));
-//                    if (psiRequired) {
-//                        if (!checkPreconditionImplication(aiId, ajId)) {
-//                            System.out.println("VIOLAZIONE IF RILEVATA (Co-achievers su psi che è anche precondizione):");
-//                            System.out.println("  Coppia azioni: (" + formatAction(aiId) + ", " + formatAction(ajId) + ") [" + aiId + ", " + ajId + "]");
-//                            System.out.println("  psi: " + formatTerminal(psiId) + " [id=" + psiId + "] è richiesta come precondizione da almeno una delle due azioni");
-//                            System.out.println("  pre(ai): " + formatPreconditions(aiId));
-//                            System.out.println("  pre(aj): " + formatPreconditions(ajId));
-//                            return false;
-//                        }
-//                    }
-//                }
+                if (!this.isConditionInterferenceFree[psiId]) break;
+            }
+            if (this.isConditionInterferenceFree[psiId]) {
+                ifCount++;
+                System.out.println("[IF-Check] Condition " + formatTerminal(psiId) + " [id=" + psiId + "] is Interference-Free");
+            } else {
+                System.out.println("[IF-Check] Condition " + formatTerminal(psiId) + " [id=" + psiId + "] is NOT Interference-Free");
             }
         }
 
-        return true;
+        System.out.println("[IF-Check] Total conditions: " + totalComparisons);
+        System.out.println("[IF-Check] Interference-Free conditions: " + ifCount);
+        System.out.println("[IF-Check] Problem is " + (problemIF ? "" : "NOT ") + "Interference-Free");
+
+        return problemIF;
+    }
+
+    /**
+     * Restituisce il numero di condizioni che sono Interference-Free.
+     */
+    public int getInterferenceFreeConditionsCount() {
+        if (this.isConditionInterferenceFree == null) return 0;
+        int count = 0;
+        for (int psiId : getAllComparisons()) {
+            if (this.isConditionInterferenceFree[psiId]) {
+                count++;
+            }
+        }
+        return count;
     }
 
     /**
      * Verifica se la precondizione di a_i implica logicamente la precondizione di a_j.
      */
+    @Deprecated
     private boolean checkPreconditionImplication(int aiId, int ajId) {
         // pre(a_i)
         final IntSet pre_ai_terminals = actionPreconditionTerminals[aiId];
@@ -1517,46 +1443,10 @@ public class H1 implements SearchHeuristic {
         }
     }
 
-    /**
-     * Verifica se l'azione a_i ha un effetto potenzialmente interferente su almeno una
-     * precondizione di a_j
-     */
-    @Deprecated
-    private boolean affectsAnyPrecondition(int aiId, int ajId) {
-        final IntSet pre_aj_terminals = actionPreconditionTerminals[ajId];
-        if (pre_aj_terminals == null || pre_aj_terminals.isEmpty()) return false;
-
-        // Solo parte numerica: se una precondizione numerica è peggiorata da a_i
-        // Se viene trovata anche una sola precondizione numerica di aj che viene peggiorata da un effetto diretto di ai,
-        // il metodo restituisce true
-        for (int termId : pre_aj_terminals) {
-            if (allComparisons.contains(termId)) {
-                final Terminal t = Terminal.getTerminal(termId);
-                if (t instanceof Comparison cmp) {
-                    final float v = this.numericContribution(aiId, cmp);
-                    // Considera interferenza solo se peggiora la condizione richiesta
-                    if (!Float.isNaN(v) && v < 0f) return true;
-                }
-            }
-        }
-
-        return false;
-    }
-
     private boolean isGoalAction(int actionId) {
         final int lastActionId = allActions.size() - 1;
 
         return actionId == lastActionId;
-    }
-
-    /**
-     * Mi assicuro che (aiId, ajId) e (ajId, aiId) generino la stessa chiave
-     */
-    private Entry<Integer, Integer> getSymmetricKey(int a, int b) {
-        int key1 = Math.min(a, b);
-        int key2 = Math.max(a, b);
-        // SimpleImmutableEntry garantisce un hash code e un equals corretti per la mappa
-        return new AbstractMap.SimpleImmutableEntry<>(key1, key2);
     }
 
     // METODI PER LOG
@@ -1575,33 +1465,6 @@ public class H1 implements SearchHeuristic {
         } catch (Throwable t) {
             return "Terminal#" + termId;
         }
-    }
-
-    private String formatPreconditions(int aId) {
-        final IntSet pre = actionPreconditionTerminals[aId];
-        if (pre == null || pre.isEmpty()) return "{}";
-        StringBuilder sb = new StringBuilder("{");
-        boolean first = true;
-        for (int t : pre) {
-            if (!first) sb.append(", ");
-            sb.append(formatTerminal(t)).append("[id=").append(t).append("]");
-            first = false;
-        }
-        sb.append('}');
-        return sb.toString();
-    }
-
-    private String findOneIndirectPrecondition(int aiId, int ajId) {
-        if (indirectAchievers == null) return null;
-        final IntSet pre_aj = actionPreconditionTerminals[ajId];
-        if (pre_aj == null || pre_aj.isEmpty()) return null;
-        for (int preId : pre_aj) {
-            IntSet iAch = indirectAchievers[preId];
-            if (iAch != null && iAch.contains(aiId)) {
-                return formatTerminal(preId) + "[id=" + preId + "]";
-            }
-        }
-        return null;
     }
 
 }
