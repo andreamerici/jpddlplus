@@ -1266,8 +1266,7 @@ public class H1 implements SearchHeuristic {
         final IntArraySet[] directAchievers = getAllAchievers();
         final IntArraySet[] indirectAchievers = new IntArraySet[totNumberOfTerms];
 
-        final IntArraySet numericConds = getAllComparisons();
-        for (int termId : numericConds) {
+        for (int termId = 0; termId < totNumberOfTerms; termId++) {
             IntArraySet direct = directAchievers[termId];
             indirectAchievers[termId] = (direct == null) ? new IntArraySet() : new IntArraySet(direct);
         }
@@ -1277,7 +1276,7 @@ public class H1 implements SearchHeuristic {
         while (changes) {
             changes = false;
 
-            for (int termId : numericConds) {
+            for (int termId = 0; termId < totNumberOfTerms; termId++) {
                 final IntSet currentIAch = indirectAchievers[termId];
                 if (currentIAch == null || currentIAch.isEmpty()) continue;
 
@@ -1290,8 +1289,6 @@ public class H1 implements SearchHeuristic {
                     if (precondTerminals == null || precondTerminals.isEmpty()) continue;
 
                     for (int preId : precondTerminals) {
-                        if (!numericConds.contains(preId)) continue; // considera solo precondizioni numeriche
-
                         final IntArraySet achieversOfTerminal = directAchievers[preId];
                         if (achieversOfTerminal == null) continue;
 
@@ -1361,7 +1358,6 @@ public class H1 implements SearchHeuristic {
                     final IntSet ajPreconditions = actionPreconditionTerminals[ajId];
                     if (ajPreconditions != null) {
                         for (int precondId : ajPreconditions) {
-                            if (!getAllComparisons().contains(precondId)) continue;
                             IntSet iAchSet = indirectAchievers[precondId];
                             if (iAchSet != null && iAchSet.contains(aiId)) {
                                 aiIsIndirectAchiever = true;
