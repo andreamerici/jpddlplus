@@ -176,6 +176,8 @@ public class H1 implements SearchHeuristic {
     private final boolean storeInitActions;
 
     private boolean isHelpfulMap = false;
+    private boolean idfLogging;
+    private boolean idfvLogging;
 
     public H1(PDDLProblem problem) {
         this(problem, true, false, false, "no", false, false, false, false, null, false, -1);
@@ -205,6 +207,13 @@ public class H1 implements SearchHeuristic {
                 conjunctionsMax, null, unitaryCost, -1);
     }
 
+    public H1(PDDLProblem problem, boolean additive, boolean extractRelaxedPlan, boolean maxHelpfulTransitions, String redConstraints, boolean helpfulActionsComputation, boolean reachability,
+              boolean helpfulTransitions, boolean conjunctionsMax, Map<AndCond,
+                    Collection<IntArraySet>> redundantMap, boolean unitaryCost, int compNumericStrategy) {
+        this(problem, additive, extractRelaxedPlan, maxHelpfulTransitions, redConstraints, helpfulActionsComputation, reachability,
+                helpfulTransitions, conjunctionsMax, redundantMap, unitaryCost, compNumericStrategy, false, false);
+    }
+
     /**
      * Costruisce la struttura euristica:
      * - Trasforma il problema in rappresentazione compatta (cp).
@@ -213,7 +222,10 @@ public class H1 implements SearchHeuristic {
      */
     public H1(PDDLProblem problem, boolean additive, boolean extractRelaxedPlan, boolean maxHelpfulTransitions, String redConstraints, boolean helpfulActionsComputation, boolean reachability,
               boolean helpfulTransitions, boolean conjunctionsMax, Map<AndCond,
-                    Collection<IntArraySet>> redundantMap, boolean unitaryCost, int compNumericStrategy) {
+                    Collection<IntArraySet>> redundantMap, boolean unitaryCost, int compNumericStrategy,
+              boolean idfLogging, boolean idfvLogging) {
+        this.idfLogging = idfLogging;
+        this.idfvLogging = idfvLogging;
         this.storeInitActions = false;
         long startSetup = System.currentTimeMillis();
         this.additive = additive;
@@ -1262,6 +1274,9 @@ public class H1 implements SearchHeuristic {
      */
     // 2
     private IntArraySet[] calculateIndirectAchievers() {
+        if (idfLogging || idfvLogging) {
+            System.out.println("[IAch] Starting calculation of Indirect Achievers...");
+        }
         // 1. inizializzazione con gli Achievers diretti (Ach)
         final IntArraySet[] directAchievers = getAllAchievers();
         final IntArraySet[] indirectAchievers = new IntArraySet[totNumberOfTerms];
@@ -1272,9 +1287,14 @@ public class H1 implements SearchHeuristic {
         }
 
         boolean changes = true;
+        int iteration = 0;
         // propagazione all'indietro, continua finché in un'iterazione vengono aggiunte nuove azioni
         while (changes) {
             changes = false;
+            iteration++;
+            if (idfvLogging) {
+                System.out.println("[IAch] Iteration " + iteration);
+            }
 
             for (int termId = 0; termId < totNumberOfTerms; termId++) {
                 final IntSet currentIAch = indirectAchievers[termId];
@@ -1296,6 +1316,9 @@ public class H1 implements SearchHeuristic {
                         for (int aId : achieversOfTerminal) {
                             // aggiungi se non è già presente in IAch(termId)
                             if (!currentIAch.contains(aId)) {
+                                if (idfvLogging) {
+                                    System.out.println("[IAch] Found new indirect achiever for " + formatTerminal(termId) + ": " + formatAction(aId) + " (via action " + formatAction(aPrimeId) + " requiring " + formatTerminal(preId) + ")");
+                                }
                                 newAdditions.add(aId);
                             }
                         }
@@ -1310,6 +1333,9 @@ public class H1 implements SearchHeuristic {
             }
         }
 
+        if (idfLogging || idfvLogging) {
+            System.out.println("[IAch] Finished calculation of Indirect Achievers in " + iteration + " iterations.");
+        }
         return indirectAchievers;
     }
 
@@ -1318,6 +1344,9 @@ public class H1 implements SearchHeuristic {
      * Valuta se il problema è interference-free e popola isConditionInterferenceFree
      */
     private boolean isProblemInterferenceFree() {
+        if (idfLogging || idfvLogging) {
+            System.out.println("[IF-Check] Starting Interference-Free check...");
+        }
         ensureAchieversComputed();
         // calcola le dipendenze una sola volta
         final IntArraySet[] directAchievers = getAllAchievers();
@@ -1339,10 +1368,17 @@ public class H1 implements SearchHeuristic {
             final IntArraySet achievers = directAchievers[psiId];
             if (achievers == null || achievers.size() < 2) {
                 ifCount++;
+                if (idfvLogging) {
+                    System.out.println("[IF-Check] Condition " + formatTerminal(psiId) + " [id=" + psiId + "] has " + (achievers == null ? 0 : achievers.size()) + " achievers, skipping.");
+                }
                 continue;
             }
 
             int[] achArray = achievers.toIntArray();
+
+            if (idfvLogging) {
+                System.out.println("[IF-Check] Checking condition " + formatTerminal(psiId) + " with " + achArray.length + " achievers.");
+            }
 
             // itera su tutte le coppie di achievers (a_i, a_j) per questa psi
             for (int i = 0; i < achArray.length; i++) {
@@ -1361,6 +1397,12 @@ public class H1 implements SearchHeuristic {
                             IntSet iAchSet = indirectAchievers[precondId];
                             if (iAchSet != null && iAchSet.contains(aiId)) {
                                 aiIsIndirectAchiever = true;
+                                if (idfLogging || idfvLogging) {
+                                    System.out.println("[IF-Check] Violation for condition " + formatTerminal(psiId) + ": action " + formatAction(aiId) + " interferes with " + formatAction(ajId));
+                                    if (idfvLogging) {
+                                        System.out.println("[IF-Check] Verbose: action " + formatAction(aiId) + " is an indirect achiever of " + formatTerminal(precondId) + " which is a precondition of " + formatAction(ajId));
+                                    }
+                                }
                                 break;
                             }
                         }
@@ -1369,7 +1411,6 @@ public class H1 implements SearchHeuristic {
                     if (aiIsIndirectAchiever) {
                         this.isConditionInterferenceFree[psiId] = false;
                         problemIF = false;
-                        System.out.println("[IF-Check] Violation for condition " + formatTerminal(psiId) + ": action " + formatAction(aiId) + " interferes with " + formatAction(ajId));
                         break;
                     }
                 }
@@ -1377,15 +1418,21 @@ public class H1 implements SearchHeuristic {
             }
             if (this.isConditionInterferenceFree[psiId]) {
                 ifCount++;
-                System.out.println("[IF-Check] Condition " + formatTerminal(psiId) + " [id=" + psiId + "] is Interference-Free");
+                if (idfvLogging) {
+                    System.out.println("[IF-Check] Condition " + formatTerminal(psiId) + " [id=" + psiId + "] is Interference-Free");
+                }
             } else {
-                System.out.println("[IF-Check] Condition " + formatTerminal(psiId) + " [id=" + psiId + "] is NOT Interference-Free");
+                if (idfLogging || idfvLogging) {
+                    System.out.println("[IF-Check] Condition " + formatTerminal(psiId) + " [id=" + psiId + "] is NOT Interference-Free");
+                }
             }
         }
 
-        System.out.println("[IF-Check] Total conditions: " + totalComparisons);
-        System.out.println("[IF-Check] Interference-Free conditions: " + ifCount);
-        System.out.println("[IF-Check] Problem is " + (problemIF ? "" : "NOT ") + "Interference-Free");
+        if (idfLogging || idfvLogging) {
+            System.out.println("[IF-Check] Total conditions: " + totalComparisons);
+            System.out.println("[IF-Check] Interference-Free conditions: " + ifCount);
+            System.out.println("[IF-Check] Problem is " + (problemIF ? "" : "NOT ") + "Interference-Free");
+        }
 
         return problemIF;
     }

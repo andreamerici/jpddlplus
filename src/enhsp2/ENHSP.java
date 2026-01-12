@@ -107,6 +107,8 @@ public class ENHSP {
     boolean printMakespan;
     private static boolean aibrDebug = false;
     boolean pls;
+    boolean idfvLogging;
+    boolean idfLogging;
     boolean bucketBasedQueueSearch;
     boolean tunnelling;
 
@@ -307,6 +309,8 @@ public class ENHSP {
         options.addOption("pls", false, "Print the very last state");
         options.addOption("bbqs", false, "Use Bucket Based Priority Queue in the search if applicable");
         options.addOption("tun", false, "(Experimental) Use tunnelling  during search");
+        options.addOption("idf", false, "Enable Interference-Free check logging");
+        options.addOption("idfv", false, "Enable verbose Interference-Free check logging");
 
         return options;
     }
@@ -353,6 +357,8 @@ public class ENHSP {
             }
 
             pls = cmd.hasOption("pls");
+            idfLogging = cmd.hasOption("idf");
+            idfvLogging = cmd.hasOption("idfv");
             String ea = cmd.getOptionValue("ea");
             if (ea != null) {
                 if (ea.equals("all")){
@@ -501,7 +507,7 @@ public class ENHSP {
     private void setHeuristic() {
 //        System.out.println("ha:" + helpfulActionsPruning + " ht" + helpfulTransitions);
         h = PDDLHeuristic.getHeuristic(heuristic, heuristicProblem, redundantConstraints, helpfulActions, helpfulTransitions,
-                unitCostHeuristic || ignoreMetric, linearEffectsAbstraction,aibrDebug );
+                unitCostHeuristic || ignoreMetric, linearEffectsAbstraction,aibrDebug, idfLogging, idfvLogging );
     }
 
     private PDDLSolution search() throws Exception {

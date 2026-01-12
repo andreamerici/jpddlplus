@@ -51,7 +51,9 @@ public class PDDLHeuristic {
             boolean helpfulTransitions,
             boolean toOneTransformation,
             int linearEffectsAbstraction,
-            boolean aibrDebugging
+            boolean aibrDebugging,
+            boolean idfLogging,
+            boolean idfvLogging
     ) {
         if (redundantConstraints == null) {
             redundantConstraints = "";
@@ -61,7 +63,7 @@ public class PDDLHeuristic {
 
         if ("smart".equals(redundantConstraints)) {
             final H1 h1 = new H1(heuristicProblem, true, true, false,
-                    "smart", false, true, false, false, false, linearEffectsAbstraction);
+                    "smart", false, true, false, false, null, false, linearEffectsAbstraction, idfLogging, idfvLogging);
             h1.computeEstimate(heuristicProblem.getInit());
         }
 
@@ -70,7 +72,7 @@ public class PDDLHeuristic {
                 return new GoalCounting(heuristicProblem);
             case "hadd":
                 return new H1(heuristicProblem, true, false, false, redundantConstraints, helpfulActionsPruning,
-                        false, helpfulTransitions, false, redConstraint, toOneTransformation, linearEffectsAbstraction);
+                        false, helpfulTransitions, false, redConstraint, toOneTransformation, linearEffectsAbstraction, idfLogging, idfvLogging);
             case "haddb":
                 return new H1WithBucketEXP(heuristicProblem, true, false, false, redundantConstraints,
                         helpfulActionsPruning, false, helpfulTransitions, false, redConstraint, toOneTransformation, linearEffectsAbstraction);
@@ -81,9 +83,9 @@ public class PDDLHeuristic {
             case "mgc":
                 return new ManhattanHeuristic(heuristicProblem);
             case "hradd":
-                return new H1(heuristicProblem, true, false, false, "brute", false, false, false, false, toOneTransformation, linearEffectsAbstraction);
+                return new H1(heuristicProblem, true, false, false, "brute", false, false, false, false, null, toOneTransformation, linearEffectsAbstraction, idfLogging, idfvLogging);
             case "hrmax":
-                return new H1(heuristicProblem, false, false, false, "brute", false, false, false, false, toOneTransformation, linearEffectsAbstraction);
+                return new H1(heuristicProblem, false, false, false, "brute", false, false, false, false, null, toOneTransformation, linearEffectsAbstraction, idfLogging, idfvLogging);
             case "hrmaxb":
                 return new H1WithBucketEXP(heuristicProblem, false, false, false, "brute", false, false, false, false, toOneTransformation, linearEffectsAbstraction);
             case "h1res":
@@ -95,9 +97,9 @@ public class PDDLHeuristic {
             case "h1res4":
                 return new H1Res(heuristicProblem, redundantConstraints, false, true);
             case "hmax":
-                return new H1(heuristicProblem, false, false, false, redundantConstraints, false, false, false, false, redConstraint, false, linearEffectsAbstraction);
+                return new H1(heuristicProblem, false, false, false, redundantConstraints, false, false, false, false, redConstraint, false, linearEffectsAbstraction, idfLogging, idfvLogging);
             case "hmrp":
-                return new H1(heuristicProblem, true, true, false, redundantConstraints, helpfulActionsPruning, false, helpfulTransitions, true, redConstraint, toOneTransformation, linearEffectsAbstraction);
+                return new H1(heuristicProblem, true, true, false, redundantConstraints, helpfulActionsPruning, false, helpfulTransitions, true, redConstraint, toOneTransformation, linearEffectsAbstraction, idfLogging, idfvLogging);
             case "hmrpb":
                 return new H1WithBucketEXP(heuristicProblem, true, true, false, redundantConstraints, helpfulActionsPruning, false, helpfulTransitions, true, redConstraint, toOneTransformation, linearEffectsAbstraction);
             case "hmrp_fix":
