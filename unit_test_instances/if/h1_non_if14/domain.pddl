@@ -5,16 +5,19 @@
 
   ;; Azione A: Achiever diretto + Helper
   (:action run-exploit
+    :parameters ()
     :precondition (server-online)
     :effect (and (increase (disk-space) 500) (has-root)))
 
   ;; Azione B: Achiever diretto che dipende da A
   (:action delete-logs
+    :parameters ()
     :precondition (and (has-root) (backup-done))
     :effect (increase (disk-space) 1000))
 
   ;; Azione C: Indipendente
   (:action compress-db
+    :parameters ()
     :precondition (can-compress)
     :effect (increase (disk-space) 300))
 )

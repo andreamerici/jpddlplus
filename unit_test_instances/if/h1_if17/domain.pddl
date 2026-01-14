@@ -4,14 +4,17 @@
   (:functions (vtotal) (temp))
 
   (:action boost-auto
+    :parameters ()
     :precondition (and (mode-auto) (sensor-on))
     :effect (increase (vtotal) 10))
 
   (:action boost-manual
+    :parameters ()
     :precondition (mode-manual)
     :effect (increase (vtotal) 10))
 
   (:action boost-emergency
+    :parameters ()
     :precondition (>= (temp) 100)
     :effect (increase (vtotal) 10))
 )

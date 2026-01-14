@@ -4,14 +4,17 @@
   (:functions (xp))
 
   (:action kill-boss
+    :parameters ()
     :precondition (and (has-weapon) (in-dungeon))
     :effect (and (increase (xp) 500) (boss-key)))
 
   (:action open-treasure
+    :parameters ()
     :precondition (boss-key)
     :effect (increase (xp) 500))
 
   (:action grind-minions
+    :parameters ()
     :precondition (in-dungeon)
     :effect (increase (xp) 10))
 )

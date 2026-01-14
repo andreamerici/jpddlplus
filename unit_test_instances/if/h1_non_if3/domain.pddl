@@ -3,6 +3,7 @@
   (:functions (x) (y))
 
   (:action a1
+    :parameters ()
     :precondition (>= (x) 0)
     :effect (increase (x) 5))
 

@@ -10,6 +10,7 @@
 
   ;; a_i: Achiever di total-items e IAch di pre(a_j)
   (:action prepare-parts
+    :parameters ()
     :precondition (>= (raw-material) 5)
     :effect (and
         (parts-available)
@@ -18,6 +19,7 @@
 
   ;; a_j: Achiever dello stesso obiettivo numerico
   (:action assemble-product
+    :parameters ()
     :precondition (parts-available)
     :effect (and
         (increase (total-items) 10)
@@ -25,6 +27,7 @@
 
   ;; Azione ausiliaria per scalabilità
   (:action calibrate-machine
+    :parameters ()
     :precondition (machine-hot)
     :effect (increase (total-items) 2))
 )
