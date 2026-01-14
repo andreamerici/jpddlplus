@@ -2,6 +2,7 @@ package enhsp2;
 
 
 import com.hstairs.ppmajal.PDDLProblem.*;
+import com.hstairs.ppmajal.conditions.Terminal;
 import com.hstairs.ppmajal.domain.PDDLDomain;
 import com.hstairs.ppmajal.extraUtils.Utils;
 import com.hstairs.ppmajal.pddl.heuristics.PDDLHeuristic;
@@ -475,6 +476,8 @@ public class ENHSP {
         System.out.println("|A|:" + getProblem().getActions().size());
         System.out.println("|P|:" + getProblem().getProcessesSet().size());
         System.out.println("|E|:" + getProblem().getEventsSet().size());
+        System.out.println("|C|:" + Terminal.getTotPropositionalCounter());
+        System.out.println("|N|:" + Terminal.getTotComparisonCounter());
         if (pddlPlus) {
             System.out.println("Delta time heuristic model:" + deltaHeuristic);
             System.out.println("Delta time planning model:" + deltaPlanning);

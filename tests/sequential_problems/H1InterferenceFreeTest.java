@@ -10,6 +10,8 @@ public class H1InterferenceFreeTest {
 
     private void assertIF(String dom, String prob, boolean expectedIF, int expectedIFCount) throws Exception {
         PlannerUtils pu = new PlannerUtils();
+        pu.setIdf(true);
+        pu.setIdfv(true);
         boolean actualIF = pu.isInterferenceFree(dom, prob);
         int actualIFCount = pu.getInterferenceFreeConditionsCount(dom, prob);
         System.out.println(String.format("[IF-Check] %s | expectedIF=%s, actualIF=%s, expectedCount=%d, actualCount=%d",

@@ -31,6 +31,7 @@ public abstract class Terminal extends Condition {
 
     private static int totCounter = 0;
     private static int totComparisonCounter = 0;
+    private static int totPropositionalCounter = 0;
 
     private static ArrayList<Terminal> id2terminal = new ArrayList();
     private final int id;
@@ -42,6 +43,8 @@ public abstract class Terminal extends Condition {
 //        System.out.println(totCounter);
         if (this instanceof Comparison){
             totComparisonCounter++;
+        } else if (this instanceof BoolPredicate) {
+            totPropositionalCounter++;
         }
     }
 
@@ -51,6 +54,14 @@ public abstract class Terminal extends Condition {
 
     public static int getTotCounter() {
         return totCounter;
+    }
+
+    public static int getTotComparisonCounter() {
+        return totComparisonCounter;
+    }
+
+    public static int getTotPropositionalCounter() {
+        return totPropositionalCounter;
     }
 
     public static Terminal getTerminal(int t) {

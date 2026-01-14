@@ -75,6 +75,7 @@ public class IPCDatasetInterferenceFreeTest {
                                     ExecutorService exec = Executors.newSingleThreadExecutor();
                                     Future<Boolean> fut = exec.submit(() -> {
                                         PlannerUtils pu = new PlannerUtils();
+                                        pu.setIdf(true);
                                         return pu.isInterferenceFree(domainPath, problemPath);
                                     });
 

@@ -37,6 +37,16 @@ public class PlannerUtils {
     PDDLDomain d;
     PDDLProblem p;
     SearchHeuristic h;
+    boolean idf = false;
+    boolean idfv = false;
+
+    public void setIdf(boolean idf) {
+        this.idf = idf;
+    }
+
+    public void setIdfv(boolean idfv) {
+        this.idfv = idfv;
+    }
 
 
     private void setup(String domainFileName, String problemFileName, String heuristic) throws Exception {
@@ -57,13 +67,13 @@ public class PlannerUtils {
                 h = new Aibr(p);
                 break;
             case "hadd":
-                h = new H1(p,true);
+                h = new H1(p, true, false, false, "no", false, false, false, false, null, false, -1, idf, idfv);
                 break;
             case "hmax":
-                h = new H1(p,false);
+                h = new H1(p, false, false, false, "no", false, false, false, false, null, false, -1, idf, idfv);
                 break;
             case "hrmax":
-                h = new H1(p,false,false,false,"brute",false,false,false,false,false);
+                h = new H1(p, false, false, false, "brute", false, false, false, false, null, false, -1, idf, idfv);
                 break;
             default:
                 throw new IllegalStateException("Unexpected value: " + heuristic);
