@@ -1,8 +1,46 @@
 package sequential_problems;
 
+import com.google.common.collect.Sets;
+import com.hstairs.ppmajal.PDDLProblem.*;
+import com.hstairs.ppmajal.conditions.*;
+import com.hstairs.ppmajal.domain.PDDLDomain;
+import com.hstairs.ppmajal.domain.ParametersAsTerms;
+import com.hstairs.ppmajal.domain.SchemaGlobalConstraint;
+import com.hstairs.ppmajal.domain.Type;
+import com.hstairs.ppmajal.expressions.*;
 import com.hstairs.ppmajal.extraUtils.PlannerUtils;
+import com.hstairs.ppmajal.extraUtils.Utils;
+import com.hstairs.ppmajal.parser.PddlLexer;
+import com.hstairs.ppmajal.parser.PddlParser;
+import com.hstairs.ppmajal.pddl.heuristics.advanced.Aibr;
+import com.hstairs.ppmajal.problem.RelState;
+import com.hstairs.ppmajal.problem.State;
+import com.hstairs.ppmajal.propositionalFactory.*;
+import com.hstairs.ppmajal.search.SearchProblem;
+import com.hstairs.ppmajal.search.searchnodes.SearchNode;
+import com.hstairs.ppmajal.transition.ConditionalEffects;
+import com.hstairs.ppmajal.transition.Transition;
+import com.hstairs.ppmajal.transition.TransitionGround;
+import com.hstairs.ppmajal.transition.TransitionSchema;
+import it.unimi.dsi.fastutil.ints.IntArraySet;
+import it.unimi.dsi.fastutil.ints.IntIterator;
+import it.unimi.dsi.fastutil.objects.Object2FloatMap;
+import it.unimi.dsi.fastutil.objects.ObjectIterator;
+import org.antlr.runtime.ANTLRInputStream;
+import org.antlr.runtime.CommonTokenStream;
+import org.antlr.runtime.RecognitionException;
+import org.antlr.runtime.tree.CommonTree;
+import org.antlr.runtime.tree.Tree;
+import org.apache.commons.lang3.tuple.ImmutablePair;
+import org.jgrapht.alg.util.Pair;
 import org.junit.Ignore;
 import org.junit.Test;
+
+import java.io.*;
+import java.math.BigDecimal;
+import java.util.*;
+import java.util.logging.Level;
+import java.util.logging.Logger;
 
 import static org.junit.Assert.*;
 
@@ -184,6 +222,23 @@ public class H1InterferenceFreeTest {
     /**
      * Test su domini custom
      */
+    @Test
+    public void testIF0() throws Exception {
+        PlannerUtils pu = new PlannerUtils();
+        pu.setIdf(true);
+        pu.setIdfv(true);
+        String dom = "unit_test_instances/if/h1_if0/domain.pddl";
+        String prob = "unit_test_instances/if/h1_if0/problem.pddl";
+
+        int hadd = pu.heuristicEstimate(dom, prob, "hadd");
+        System.out.println("---");
+        int hmax = pu.heuristicEstimate(dom, prob, "hmax");
+        System.out.println("[H1][Blocks] hadd=" + hadd + ", hmax=" + hmax);
+        System.out.println("---");
+        int planSize = pu.getPlanSize(dom, prob, "hmax");
+        System.out.println("[H1][Blocks] planSize=" + planSize);
+    }
+
     @Test
     public void testIF1() throws Exception {
         assertIF(
