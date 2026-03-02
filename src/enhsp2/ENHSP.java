@@ -5,6 +5,7 @@ import com.hstairs.ppmajal.PDDLProblem.*;
 import com.hstairs.ppmajal.domain.PDDLDomain;
 import com.hstairs.ppmajal.extraUtils.Utils;
 import com.hstairs.ppmajal.pddl.heuristics.PDDLHeuristic;
+import com.hstairs.ppmajal.pddl.heuristics.advanced.H1;
 import com.hstairs.ppmajal.search.SearchHeuristic;
 import com.hstairs.ppmajal.transition.TransitionGround;
 import com.hstairs.enhsp2.SimpleExternalLogger;
@@ -107,6 +108,8 @@ public class ENHSP {
     boolean printMakespan;
     private static boolean aibrDebug = false;
     boolean pls;
+    boolean idfvLogging;
+    boolean idfLogging;
     boolean bucketBasedQueueSearch;
     boolean tunnelling;
 
@@ -150,7 +153,7 @@ public class ENHSP {
             }
 
 
-            
+
             if (printActions){
                 System.out.println(localProblem.getTransitions());
             }
@@ -307,6 +310,12 @@ public class ENHSP {
         options.addOption("pls", false, "Print the very last state");
         options.addOption("bbqs", false, "Use Bucket Based Priority Queue in the search if applicable");
         options.addOption("tun", false, "(Experimental) Use tunnelling  during search");
+        options.addOption(Option.builder("if")
+                .hasArg()
+                .optionalArg(true)
+                .argName("level")
+                .desc("Enable Interference-Free. Levels: on|log|verbose. Default: on (no extra logs)")
+                .build());
 
         return options;
     }
@@ -326,7 +335,7 @@ public class ENHSP {
                 System.out.println(optionValue);
                 Utils.tolerance = Double.parseDouble(optionValue);
             }
-            
+
             if (heuristic == null) {
                 heuristic = "hadd";
             }
@@ -353,6 +362,25 @@ public class ENHSP {
             }
 
             pls = cmd.hasOption("pls");
+            boolean enableIF = cmd.hasOption("if");
+            String ifLevel = cmd.getOptionValue("if");
+
+            boolean idfLoggingLocal = false;
+            boolean idfvLoggingLocal = false;
+
+            if (enableIF) {
+                if (ifLevel != null) {
+                    if (ifLevel.equalsIgnoreCase("log")) {
+                        idfLoggingLocal = true;
+                    } else if (ifLevel.equalsIgnoreCase("verbose") || ifLevel.equalsIgnoreCase("v")) {
+                        idfvLoggingLocal = true;
+                    }
+                }
+            }
+
+            this.idfLogging = idfLoggingLocal;
+            this.idfvLogging = idfvLoggingLocal;
+            H1.setInterferenceFreeEnabled(enableIF);
             String ea = cmd.getOptionValue("ea");
             if (ea != null) {
                 if (ea.equals("all")){
@@ -399,7 +427,7 @@ public class ENHSP {
                 deltaPlanning = delta;
                 deltaExecution = delta;
             }
-            
+
             inputPlan = cmd.getOptionValue("inputplan");
 
             String k = cmd.getOptionValue("k");
@@ -501,7 +529,7 @@ public class ENHSP {
     private void setHeuristic() {
 //        System.out.println("ha:" + helpfulActionsPruning + " ht" + helpfulTransitions);
         h = PDDLHeuristic.getHeuristic(heuristic, heuristicProblem, redundantConstraints, helpfulActions, helpfulTransitions,
-                unitCostHeuristic || ignoreMetric, linearEffectsAbstraction,aibrDebug );
+                unitCostHeuristic || ignoreMetric, linearEffectsAbstraction, aibrDebug, this.idfLogging, this.idfvLogging);
     }
 
     private PDDLSolution search() throws Exception {
@@ -519,12 +547,17 @@ public class ENHSP {
             Runtime.getRuntime().addShutdownHook(new Thread() {//this is to save json also when the planner is interrupted
                 @Override
                 public void run() {
-                        planner.getSearchSpaceHandle().printJson(
-                                getProblem().getPddlFileReference() + ".sp_log");
+                    planner.getSearchSpaceHandle().printJson(
+                            getProblem().getPddlFileReference() + ".sp_log");
                 }
             });
         }
         overallStart = System.currentTimeMillis();
+
+        // --- Aggiunto Log Euristica Iniziale per analysis.py ---
+        float hInit = h.computeEstimate(problem.getInit());
+        System.out.println("h(I): " + hInit);
+
         PDDLSolution plan = planner.plan(problem, h);
         overallPlanningTime = (System.currentTimeMillis() - overallStart);
         endGValue = plan.gValueAtTheEnd();

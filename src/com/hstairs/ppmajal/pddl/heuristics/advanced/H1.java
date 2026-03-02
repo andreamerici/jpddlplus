@@ -16,7 +16,7 @@
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston,
  * MA 02110-1301  USA
  */
- /*
+/*
  * To change this license header, choose License Headers in Project Properties.
  * To change this template file, choose Tools | Templates
  * and open the template in the editor.
@@ -96,14 +96,14 @@ public class H1 implements SearchHeuristic {
 
     final float UNKNOWNEFFECT = Float.NEGATIVE_INFINITY;
     final protected IntArraySet freePreconditionActions;
-//    private List<Pair<Integer, IntArraySet>> plan;
+    //    private List<Pair<Integer, IntArraySet>> plan;
     private IntArraySet plan;
     final protected IntArraySet[] repetitionsInThePlan;
     private float[] minAchieverPreconditionCost;
     protected IntArraySet allActions;
 
     final boolean useSmartConstraints;
-    
+
 
     //Plan Fixing Data Structures;
     final boolean[] visited;
@@ -115,33 +115,56 @@ public class H1 implements SearchHeuristic {
 
     private boolean isHelpfulMap = false;
 
+    private static volatile boolean IF_ENABLED = false;
+    public static void setInterferenceFreeEnabled(boolean e) { IF_ENABLED = e; }
+    private boolean idfLogging;   // -if log
+    private boolean idfvLogging;  // -if verbose
+
+    final IntArraySet[] actionPreconditionSet;
+    private IntArraySet[] conditionIAchSet;
+    private IntArraySet[] actionIAchSet;
+    private boolean[] isConditionIF;
+    private int[][][] partitionIFPreconditionSet;
+    private int[][] nonIFPreconditions;
+
     public H1(PDDLProblem problem) {
         this(problem, true, false, false, "no", false, false, false, false, null, false, -1);
     }
 
 
-    
+
     public H1(PDDLProblem problem, boolean additive) {
         this(problem, additive, false, false, "no", false, false, false, false, null, false, -1);
     }
 
     public H1(PDDLProblem problem, boolean additive, boolean extractRelaxedPlan, boolean maxHelpfulTransitions, String redConstraints, boolean helpfulActionsComputation, boolean reachability,
-            boolean helpfulTransitions, boolean conjunctionsMax, boolean unitaryCost, int linearEffectsAbstraction) {
+              boolean helpfulTransitions, boolean conjunctionsMax, boolean unitaryCost, int linearEffectsAbstraction) {
         this(problem, additive, extractRelaxedPlan, maxHelpfulTransitions,
                 redConstraints, helpfulActionsComputation, reachability,
                 helpfulTransitions, conjunctionsMax, null, unitaryCost, linearEffectsAbstraction);
     }
 
     public H1(PDDLProblem problem, boolean additive, boolean extractRelaxedPlan, boolean maxHelpfulTransitions, String redConstraints, boolean helpfulActionsComputation, boolean reachability,
-            boolean helpfulTransitions, boolean conjunctionsMax, boolean unitaryCost) {
+              boolean helpfulTransitions, boolean conjunctionsMax, boolean unitaryCost) {
         this(problem, additive, extractRelaxedPlan, maxHelpfulTransitions,
                 redConstraints, helpfulActionsComputation, reachability, helpfulTransitions,
                 conjunctionsMax, null, unitaryCost, -1);
     }
 
     public H1(PDDLProblem problem, boolean additive, boolean extractRelaxedPlan, boolean maxHelpfulTransitions, String redConstraints, boolean helpfulActionsComputation, boolean reachability,
-            boolean helpfulTransitions, boolean conjunctionsMax, Map<AndCond,
-            Collection<IntArraySet>> redundantMap, boolean unitaryCost, int compNumericStrategy) {
+              boolean helpfulTransitions, boolean conjunctionsMax, Map<AndCond,
+                    Collection<IntArraySet>> redundantMap, boolean unitaryCost, int compNumericStrategy,
+              boolean idfLogging, boolean idfvLogging) {
+        this(problem, additive, extractRelaxedPlan, maxHelpfulTransitions, redConstraints,
+                helpfulActionsComputation, reachability, helpfulTransitions, conjunctionsMax,
+                redundantMap, unitaryCost, compNumericStrategy);
+        this.idfLogging  = idfLogging;
+        this.idfvLogging = idfvLogging;
+    }
+
+    public H1(PDDLProblem problem, boolean additive, boolean extractRelaxedPlan, boolean maxHelpfulTransitions, String redConstraints, boolean helpfulActionsComputation, boolean reachability,
+              boolean helpfulTransitions, boolean conjunctionsMax, Map<AndCond,
+                    Collection<IntArraySet>> redundantMap, boolean unitaryCost, int compNumericStrategy) {
         this.storeInitActions = false;
         long startSetup = System.currentTimeMillis();
         this.additive = additive;
@@ -204,7 +227,7 @@ public class H1 implements SearchHeuristic {
 
         conditionInit = new boolean[totNumberOfTerms];
         actionInit = new boolean[cp.numActions()];
-        if (extractRelaxedPlan || useSmartConstraints || helpfulActionsComputation) {
+        if (extractRelaxedPlan || useSmartConstraints || helpfulActionsComputation || IF_ENABLED) {
             allAchievers = new IntArraySet[totNumberOfTerms];
         }
         if (useSmartConstraints) {
@@ -238,6 +261,20 @@ public class H1 implements SearchHeuristic {
             repetitionsInThePlan = null;
         }
 
+        actionPreconditionSet = new IntArraySet[cp.numActions()];
+        for (int aId : allActions) { actionPreconditionSet[aId] = new IntArraySet(); }
+        for (int aId : allActions) {
+            for (Condition c : cp.preconditionFunction()[aId].getTerminalConditionsInArray()) {
+                if (c instanceof Comparison) actionPreconditionSet[aId].add(((Comparison) c.normalize()).getId());
+                else if (c instanceof Terminal) actionPreconditionSet[aId].add(((Terminal) c).getId());
+            }
+        }
+    }
+
+    public void setIFLogging(boolean log, boolean vlog) {
+        this.idfLogging = log;
+        this.idfvLogging = vlog;
+        if (IF_ENABLED && partitionIFPreconditionSet == null) initIF();
     }
 
     private void fillPreEffFunctions(LinkedHashSet<TransitionGround> transitions) {
@@ -251,7 +288,7 @@ public class H1 implements SearchHeuristic {
 
     }
 
-    
+
     void updatePreconditionFunction(int i) {
         final Collection<Condition> terminalConditions = cp.preconditionFunction()[i].getTerminalConditionsInArray();
         if (terminalConditions.isEmpty()) {
@@ -305,7 +342,7 @@ public class H1 implements SearchHeuristic {
             actionInit[freePreconditionAction] = true;
             addActionsInPriority(freePreconditionAction, h, 0f);
         }
-        
+
         if (storeInitActions){
             initActions = new ArrayList<>();
             for (var act: allActions ){
@@ -343,15 +380,15 @@ public class H1 implements SearchHeuristic {
                 expand(actionId, h, gs);
             }
         }
-        
+
         if (getActionHCost()[cp.goal()] == Float.MAX_VALUE ){
             return Float.MAX_VALUE;
         }
-        
+
         if (this.extractRelaxedPlan){
             return relaxedPlanCost(gs);
         }
-        
+
         if (this.isHelpfulActionsComputation()){//this is to be used when hadd is wanted to be used with helpful actions taken from mrp
             relaxedPlanCost(gs);
         }
@@ -375,7 +412,9 @@ public class H1 implements SearchHeuristic {
         if (actions != null) {
             for (final int i : actions) {
                 if (!getClosed()[i]) {
-                    float v = estimateCost(cp.preconditionFunction()[i], getActionHCost()[i]);
+                    float v = (IF_ENABLED && partitionIFPreconditionSet != null)
+                            ? estimateCostIF(i, getActionHCost()[i])
+                            : estimateCost(cp.preconditionFunction()[i], getActionHCost()[i]);
                     if (init && v == 0) {
                         actionInit[i] = true;
                     }
@@ -430,14 +469,14 @@ public class H1 implements SearchHeuristic {
                                 }
                             }
                         }
-                        
+
                         final int actionId = establishedAchiever[conditionId];
                         final int rep = (int) ceil(numRepetition[conditionId]);
                         final int trActionId = cp.cpTr2TrMap()[actionId];
                         if (repetitionsInThePlan[trActionId] == null){
                             repetitionsInThePlan[trActionId] = new IntArraySet();
                         }
-                        
+
                         if (maxNumRepetition[trActionId] != rep){
                             repetitionsInThePlan[trActionId].add(rep);
                             maxNumRepetition[trActionId] = Math.max(maxNumRepetition[trActionId],rep);
@@ -450,7 +489,7 @@ public class H1 implements SearchHeuristic {
                 }
             }
         }
-        
+
         //This is the MRP
         float ret = 0;
         for (final int action : plan) {
@@ -468,8 +507,8 @@ public class H1 implements SearchHeuristic {
     public Collection getAllEstimates() {
         return SearchHeuristic.super.getAllEstimates(); //To change body of generated methods, choose Tools | Templates.
     }
-    
-    
+
+
 
     public IntArraySet getAchievers(int conditionId) {
         final IntArraySet achiever = getAllAchievers()[conditionId];
@@ -502,10 +541,14 @@ public class H1 implements SearchHeuristic {
                         if (isAdditive()) {
                             localUpdate = updateIfNeeded(conditionId, getActionHCost()[actionId] + newCost);
                         } else {
-                            if (getActionHCost()[actionId] < minAchieverPreconditionCost[conditionId]) {
-                                minAchieverPreconditionCost[conditionId] = getActionHCost()[actionId];
+                            if (isConditionIF != null && conditionId < isConditionIF.length && isConditionIF[conditionId]) {
+                                localUpdate = updateIfNeeded(conditionId, getActionHCost()[actionId] + newCost);
+                            } else {
+                                if (getActionHCost()[actionId] < minAchieverPreconditionCost[conditionId]) {
+                                    minAchieverPreconditionCost[conditionId] = getActionHCost()[actionId];
+                                }
+                                localUpdate = updateIfNeeded(conditionId, minAchieverPreconditionCost[conditionId] + newCost);
                             }
-                            localUpdate = updateIfNeeded(conditionId, minAchieverPreconditionCost[conditionId] + newCost);
                         }
                         if (localUpdate) {
                             cacheValue(newCost,actionId,t);
@@ -542,7 +585,7 @@ public class H1 implements SearchHeuristic {
     }
 
     protected void updateAchievers(int conditionId, int actionId) {
-        if (extractRelaxedPlan || useSmartConstraints || isHelpfulActionsComputation() ) {
+        if (extractRelaxedPlan || useSmartConstraints || isHelpfulActionsComputation() || IF_ENABLED) {
             getAchievers(conditionId).add(actionId);
         }
     }
@@ -610,7 +653,7 @@ public class H1 implements SearchHeuristic {
     protected float estimateCost(final Condition c, float previous) {
         return this.estimateCost(c, isAdditive(),previous);
     }
-    
+
 
     private float estimateCost(final Condition c, boolean additive, float previous) {
         if (c instanceof AndCond and) {
@@ -670,7 +713,7 @@ public class H1 implements SearchHeuristic {
 
     //Semantics: UNKNOWEFFECT don't know because comp is hard. > 0 is achiever, 0 no
     protected float numericContribution(int t, Comparison comp) {
-        
+
         if (cp.numericEffectFunction()[t] == null || cp.numericEffectFunction()[t].isEmpty()) {
             return 0f;
         }
@@ -832,7 +875,7 @@ public class H1 implements SearchHeuristic {
         return res;
     }
 
-   
+
     public void addDeleter(int i, int actId) {
         if (deleters[i] == null) {
             deleters[i] = new IntArraySet();
@@ -875,10 +918,13 @@ public class H1 implements SearchHeuristic {
                     }
                 }
             }
-            Sets.SetView<Integer> intersection = Sets.intersection(getAllConditions(), (Set<Integer>)cp.propEffectFunction()[actionId]);
-            achievableTerms.addAll(intersection);
-            for (final int o : intersection) {
-                updateAchievers(o, actionId);
+            final Set<Integer> propEffects = (Set<Integer>) cp.propEffectFunction()[actionId];
+            if (propEffects != null) {
+                Sets.SetView<Integer> intersection = Sets.intersection(getAllConditions(), propEffects);
+                achievableTerms.addAll(intersection);
+                for (final int o : intersection) {
+                    updateAchievers(o, actionId);
+                }
             }
             conditionsAchievableBy[actionId] = achievableTerms;
             if (useSmartConstraints)
@@ -888,7 +934,7 @@ public class H1 implements SearchHeuristic {
         return getConditionsAchievableBy()[actionId];
     }
 
-   
+
 
     private float computeRepetition(Terminal t, double v, State s) {
         final double eval = ((Comparison) t).getLeft().eval(s);
@@ -904,7 +950,7 @@ public class H1 implements SearchHeuristic {
 
 
     protected void cacheValue(float rep, int actionId, Terminal t) {
-        
+
     }
 
     protected boolean update(Terminal t, boolean update, int actionId) {
@@ -976,8 +1022,8 @@ public class H1 implements SearchHeuristic {
     public IntArraySet getAllConditions() {
         return allConditions;
     }
-    
-        /**
+
+    /**
      * @return the reachableAchievers
      */
     public IntArraySet[] getReachableAchievers() {
@@ -1063,6 +1109,281 @@ public class H1 implements SearchHeuristic {
 
     public void setComputeHelpfulActionsMap(){
         isHelpfulMap = true;
+    }
+
+    private void initIF() {
+        for (int a : allActions) getConditionsAchievableById(a);
+        conditionIAchSet = computeIAch();
+        actionIAchSet = computeActionIAchSet();
+        classifyConditions();
+        computeIFPartition();
+    }
+
+    private IntArraySet[] computeIAch() {
+        IntArraySet[] direct = getAllAchievers();
+        IntArraySet[] indirect = new IntArraySet[totNumberOfTerms];
+
+        for (int id = 0; id < totNumberOfTerms; id++)
+            indirect[id] = direct[id] == null ? new IntArraySet() : new IntArraySet(direct[id]);
+
+        IntArraySet buf = new IntArraySet();
+        boolean changed = true;
+        int iterations = 0;
+
+        while (changed) {
+            changed = false;
+            iterations++;
+
+            for (int t = 0; t < totNumberOfTerms; t++) {
+                IntArraySet actionSet = indirect[t];
+                if (actionSet.isEmpty()) continue;
+                buf.clear();
+
+                for (int act : actionSet) {
+                    IntArraySet pre = actionPreconditionSet[act];
+                    if (pre == null) continue;
+
+                    for (int pid : pre) {
+                        IntArraySet ach = direct[pid];
+                        if (ach == null) continue;
+                        for (int a : ach)
+                            if (!actionSet.contains(a))
+                                buf.add(a);
+                    }
+                }
+
+                if (!buf.isEmpty()) {
+                    actionSet.addAll(buf);
+                    changed = true;
+                }
+            }
+        }
+
+        if (idfLogging || idfvLogging)
+            System.out.println("[IF-IAch] IAch computation completed in " + iterations + " iteration(s)");
+
+        return indirect;
+    }
+
+    private IntArraySet[] computeActionIAchSet() {
+        IntArraySet[] res = new IntArraySet[cp.numActions()];
+
+        for (int a = 0; a < cp.numActions(); a++) {
+            IntArraySet pre = actionPreconditionSet[a];
+
+            if (pre == null || pre.isEmpty()) continue;
+            IntArraySet union = null;
+
+            for (int pid : pre) {
+                IntArraySet iach = conditionIAchSet[pid];
+                if (iach == null || iach.isEmpty()) continue;
+
+                if (union == null)
+                    union = new IntArraySet(iach);
+                else union.addAll(iach);
+            }
+
+            if (union != null && !union.isEmpty())
+                res[a] = union;
+        }
+        return res;
+    }
+
+    private void classifyConditions() {
+        isConditionIF = new boolean[totNumberOfTerms];
+        Arrays.fill(isConditionIF, true);
+        IntArraySet[] direct = getAllAchievers();
+        int ifCount = 0;
+
+        for (int psi : getAllComparisons()) {
+            IntArraySet ach = direct[psi];
+            if (ach == null || ach.size() < 2) {
+                ifCount++;
+                continue;
+            }
+
+            int[] arr = ach.toIntArray();
+            outer:
+            for (int j = 0; j < arr.length; j++) {
+                if (arr[j] == cp.goal()) continue;
+                IntArraySet union = actionIAchSet[arr[j]];
+
+                if (union == null) continue;
+
+                for (int i = 0; i < arr.length; i++) {
+                    if (i == j || arr[i] == cp.goal()) continue;
+
+                    if (union.contains(arr[i]) && !precondImplies(arr[i], arr[j])) {
+                        isConditionIF[psi] = false;
+                        break outer;
+                    }
+                }
+            }
+            if (isConditionIF[psi]) ifCount++;
+        }
+
+        if (IF_ENABLED) {
+            System.out.println("[IF-Check] Total conditions: " + getAllComparisons().size());
+            System.out.println("[IF-Check] Interference-Free conditions: " + ifCount);
+        }
+
+        if (idfvLogging) {
+            for (int psi : getAllComparisons()) {
+                System.out.println("[IF-Check] Condition " + Terminal.getTerminal(psi)
+                        + " -> " + (isConditionIF[psi] ? "IF" : "non-IF"));
+            }
+        }
+    }
+
+    private boolean precondImplies(int ai, int aj) {
+        IntArraySet preAi = actionPreconditionSet[ai];
+        IntArraySet preAj = actionPreconditionSet[aj];
+        if (preAj == null || preAj.isEmpty()) return true;
+        if (preAi == null || preAi.isEmpty()) return false;
+
+        for (int tj : preAj) {
+            boolean ok = false;
+            Terminal cj = Terminal.getTerminal(tj);
+
+            for (int ti : preAi) {
+                if (ti == tj) {
+                    ok = true;
+                    break;
+                }
+
+                if (cj instanceof Comparison cmpJ) {
+                    Terminal ci = Terminal.getTerminal(ti);
+                    if (ci instanceof Comparison cmpI) {
+                        try {
+                            if (cmpI.dominate(cmpJ)) {
+                                ok = true;
+                                break;
+                            }
+                        }
+                        catch (Throwable ignored) {}
+                    }
+                }
+            }
+            if (!ok) return false;
+        }
+        return true;
+    }
+
+    private void computeIFPartition() {
+        partitionIFPreconditionSet = new int[cp.numActions()][][];
+        nonIFPreconditions = new int[cp.numActions()][];
+
+        for (int a : allActions) {
+            IntArraySet pre = actionPreconditionSet[a];
+            if (pre == null || pre.isEmpty()) continue;
+
+            List<Integer> ifL = new ArrayList<>(), nonL = new ArrayList<>();
+            for (int p : pre) {
+                if (Terminal.getTerminal(p) instanceof Comparison && isConditionIF[p])
+                    ifL.add(p);
+                else nonL.add(p);
+            }
+
+            nonIFPreconditions[a] = nonL.stream().mapToInt(x -> x).toArray();
+
+            if (ifL.isEmpty()) continue;
+
+            if (ifL.size() == 1) {
+                partitionIFPreconditionSet[a] = new int[][]{{ifL.get(0)}};
+                continue;
+            }
+
+            int n = ifL.size(); int[] parent = new int[n];
+
+            for (int i = 0; i < n; i++) parent[i] = i;
+
+            IntArraySet[] all = getAllAchievers();
+
+            for (int i = 0; i < n; i++) {
+                IntArraySet ai = all[ifL.get(i)];
+                if (ai == null) continue;
+
+                for (int j = i+1; j < n; j++) {
+                    IntArraySet aj = all[ifL.get(j)];
+                    if (aj == null) continue;
+
+                    for (int x : ai)
+                        if (aj.contains(x)) {
+                            join(parent,i,j);
+                            break;
+                        }
+                }
+            }
+
+            Map<Integer,List<Integer>> groups = new LinkedHashMap<>();
+
+            for (int i = 0; i < n; i++)
+                groups.computeIfAbsent(find(parent, i), k -> new ArrayList<>())
+                        .add(ifL.get(i));
+
+            partitionIFPreconditionSet[a] =
+                    groups.values().stream()
+                            .map(g -> g.stream().mapToInt(x -> x).toArray())
+                            .toArray(int[][]::new);
+        }
+    }
+
+    private int find(int[] p, int i) {
+        while(p[i] != i){
+            p[i] = p[p[i]];
+            i = p[i];
+        }
+        return i;
+    }
+
+    private void join(int[] p, int i, int j) {
+        p[find(p,i)] = find(p,j);
+    }
+
+    private float estimateCostIF(int a, float prev) {
+        if (partitionIFPreconditionSet == null || a >= partitionIFPreconditionSet.length
+                || (partitionIFPreconditionSet[a] == null && nonIFPreconditions[a] == null))
+            return estimateCost(cp.preconditionFunction()[a], prev);
+
+        float globalSum = 0f;
+
+        if (partitionIFPreconditionSet[a] != null) {
+            for (int[] g : partitionIFPreconditionSet[a]) {
+                float globalMax = 0f;
+
+                for (int c : g) {
+                    float v = conditionCost[c];
+
+                    if(v == Float.MAX_VALUE)
+                        return v;
+                    if(v > globalMax)
+                        globalMax = v;
+                }
+
+                globalSum += globalMax;
+                if (globalSum >= prev) return globalSum;
+            }
+        }
+
+        float ni = 0f;
+        if (nonIFPreconditions[a] != null) {
+            for (int c : nonIFPreconditions[a]) {
+                float v = conditionCost[c];
+
+                if(v==Float.MAX_VALUE)
+                    return v;
+
+                if (isAdditive())
+                    ni += v;
+                else if(v > ni)
+                    ni = v;
+
+                if (ni >= prev)
+                    return ni;
+            }
+        }
+
+        return globalSum + ni;
     }
 
 }

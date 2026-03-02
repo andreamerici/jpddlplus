@@ -51,7 +51,9 @@ public class PDDLHeuristic {
             boolean helpfulTransitions,
             boolean toOneTransformation,
             int linearEffectsAbstraction,
-            boolean aibrDebugging
+            boolean aibrDebugging,
+            boolean idfLogging,
+            boolean idfvLogging
     ) {
         if (redundantConstraints == null) {
             redundantConstraints = "";
@@ -65,64 +67,99 @@ public class PDDLHeuristic {
             h1.computeEstimate(heuristicProblem.getInit());
         }
 
+        SearchHeuristic result;
         switch (heuristic) {
             case "gc":
-                return new GoalCounting(heuristicProblem);
+                result = new GoalCounting(heuristicProblem);
+                break;
             case "hadd":
-                return new H1(heuristicProblem, true, false, false, redundantConstraints, helpfulActionsPruning,
+                result = new H1(heuristicProblem, true, false, false, redundantConstraints, helpfulActionsPruning,
                         false, helpfulTransitions, false, redConstraint, toOneTransformation, linearEffectsAbstraction);
+                break;
             case "haddb":
-                return new H1WithBucketEXP(heuristicProblem, true, false, false, redundantConstraints,
+                result = new H1WithBucketEXP(heuristicProblem, true, false, false, redundantConstraints,
                         helpfulActionsPruning, false, helpfulTransitions, false, redConstraint, toOneTransformation, linearEffectsAbstraction);
+                break;
             case "ngc":
-                return new NumericGoalCounting(heuristicProblem);
+                result = new NumericGoalCounting(heuristicProblem);
+                break;
             case "agnosticngc":
-                return new StructureSensitiveNumericGoalCounting(heuristicProblem);
+                result = new StructureSensitiveNumericGoalCounting(heuristicProblem);
+                break;
             case "mgc":
-                return new ManhattanHeuristic(heuristicProblem);
+                result = new ManhattanHeuristic(heuristicProblem);
+                break;
             case "hradd":
-                return new H1(heuristicProblem, true, false, false, "brute", false, false, false, false, toOneTransformation, linearEffectsAbstraction);
+                result = new H1(heuristicProblem, true, false, false, "brute", false, false, false, false, toOneTransformation, linearEffectsAbstraction);
+                break;
             case "hrmax":
-                return new H1(heuristicProblem, false, false, false, "brute", false, false, false, false, toOneTransformation, linearEffectsAbstraction);
+                result = new H1(heuristicProblem, false, false, false, "brute", false, false, false, false, toOneTransformation, linearEffectsAbstraction);
+                break;
             case "hrmaxb":
-                return new H1WithBucketEXP(heuristicProblem, false, false, false, "brute", false, false, false, false, toOneTransformation, linearEffectsAbstraction);
+                result = new H1WithBucketEXP(heuristicProblem, false, false, false, "brute", false, false, false, false, toOneTransformation, linearEffectsAbstraction);
+                break;
             case "h1res":
-                return new H1Res(heuristicProblem, redundantConstraints, false, false);
+                result = new H1Res(heuristicProblem, redundantConstraints, false, false);
+                break;
             case "h1res2":
-                return new H1Res(heuristicProblem, redundantConstraints, true, false);
+                result = new H1Res(heuristicProblem, redundantConstraints, true, false);
+                break;
             case "h1res3":
-                return new H1Res(heuristicProblem, redundantConstraints, true, true);
+                result = new H1Res(heuristicProblem, redundantConstraints, true, true);
+                break;
             case "h1res4":
-                return new H1Res(heuristicProblem, redundantConstraints, false, true);
+                result = new H1Res(heuristicProblem, redundantConstraints, false, true);
+                break;
             case "hmax":
-                return new H1(heuristicProblem, false, false, false, redundantConstraints, false, false, false, false, redConstraint, false, linearEffectsAbstraction);
+                result = new H1(heuristicProblem, false, false, false, redundantConstraints, false, false, false, false, redConstraint, false, linearEffectsAbstraction);
+                break;
             case "hmrp":
-                return new H1(heuristicProblem, true, true, false, redundantConstraints, helpfulActionsPruning, false, helpfulTransitions, true, redConstraint, toOneTransformation, linearEffectsAbstraction);
+                result = new H1(heuristicProblem, true, true, false, redundantConstraints, helpfulActionsPruning, false, helpfulTransitions, true, redConstraint, toOneTransformation, linearEffectsAbstraction);
+                break;
             case "hmrpb":
-                return new H1WithBucketEXP(heuristicProblem, true, true, false, redundantConstraints, helpfulActionsPruning, false, helpfulTransitions, true, redConstraint, toOneTransformation, linearEffectsAbstraction);
+                result = new H1WithBucketEXP(heuristicProblem, true, true, false, redundantConstraints, helpfulActionsPruning, false, helpfulTransitions, true, redConstraint, toOneTransformation, linearEffectsAbstraction);
+                break;
             case "hmrp_fix":
-                return new H1Fix(heuristicProblem, false, false, redundantConstraints, helpfulActionsPruning, false, false, true, false);
+                result = new H1Fix(heuristicProblem, false, false, redundantConstraints, helpfulActionsPruning, false, false, true, false);
+                break;
             case "hmrp_easy_fix":
-                return new H1Fix(heuristicProblem, true, true, redundantConstraints, helpfulActionsPruning, false, false, false, false);
+                result = new H1Fix(heuristicProblem, true, true, redundantConstraints, helpfulActionsPruning, false, false, false, false);
+                break;
             case "hmrp_fix_tran":
-                return new H1Fix(heuristicProblem, false, false, redundantConstraints, helpfulActionsPruning, false, false, false, true);
+                result = new H1Fix(heuristicProblem, false, false, redundantConstraints, helpfulActionsPruning, false, false, false, true);
+                break;
             case "blind":
-                return new BlindHeuristic(heuristicProblem);
+                result = new BlindHeuristic(heuristicProblem);
+                break;
             case "01blind":
-                return new GoalSensitiveHeuristic(heuristicProblem);
+                result = new GoalSensitiveHeuristic(heuristicProblem);
+                break;
             case "aibr":
-                return new Aibr(heuristicProblem, false, aibrDebugging);
+                result = new Aibr(heuristicProblem, false, aibrDebugging);
+                break;
             case "hlm-count":
-                return new LM(heuristicProblem);
+                result = new LM(heuristicProblem);
+                break;
             case "hlm-lp":
-                return new LM(heuristicProblem, "lp", redundantConstraints, "cplex");
+                result = new LM(heuristicProblem, "lp", redundantConstraints, "cplex");
+                break;
             case "hlm-lp-gurobi":
-                return new LM(heuristicProblem, "lp", redundantConstraints, "gurobi");
+                result = new LM(heuristicProblem, "lp", redundantConstraints, "gurobi");
+                break;
             case "hgen":
-                return new HGen(heuristicProblem);
+                result = new HGen(heuristicProblem);
+                break;
             default:
-                return new GoalSensitiveHeuristic(heuristicProblem);
+                result = new GoalSensitiveHeuristic(heuristicProblem);
+                break;
         }
+
+        // Imposta i log per interference-free se l'euristica usata è una derivata di H1 (sat-hadd lo è)
+        if (result instanceof H1) {
+            ((H1) result).setIFLogging(idfLogging, idfvLogging);
+        }
+
+        return result;
     }
 
     public static List<HeuristicInfo> getAvailableHeuristics() {
